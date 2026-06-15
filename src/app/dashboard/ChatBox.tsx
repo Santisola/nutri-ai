@@ -1,12 +1,14 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
-import { MessageCircle } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { Send, Leaf } from "lucide-react";
 import { sendChatMessage } from "./actions";
 import type { ChatMessage } from "@/lib/ai/types";
 import Markdown from "@/components/Markdown";
 
 const MAX_LEN = 600;
+
+type UIMessage = { role: "user" | "assistant"; content: string; time: string };
 
 const SUGGESTIONS = [
   "Tengo ansiedad y quiero picotear algo a media mañana, ¿qué me conviene?",
@@ -14,12 +16,23 @@ const SUGGESTIONS = [
   "Snacks con proteína fáciles para la oficina",
 ];
 
+function now(): string {
+  return new Intl.DateTimeFormat("es-AR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date());
+}
+
 export default function ChatBox() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<UIMessage[]>([]);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const listRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, pending]);
 
   function send(text: string) {
     const content = text.trim();
@@ -29,93 +42,117 @@ export default function ChatBox() {
       return;
     }
     setError(null);
-    const next: ChatMessage[] = [...messages, { role: "user", content }];
+    const next: UIMessage[] = [
+      ...messages,
+      { role: "user", content, time: now() },
+    ];
     setMessages(next);
     setInput("");
 
     start(async () => {
-      const res = await sendChatMessage(next);
+      const history: ChatMessage[] = next.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+      const res = await sendChatMessage(history);
       if (res.error || !res.reply) {
         setError(res.error ?? "Error al responder.");
-        // revertir el mensaje del usuario si falló del todo
         return;
       }
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: res.reply!.answer },
+        { role: "assistant", content: res.reply!.answer, time: now() },
       ]);
-      requestAnimationFrame(() =>
-        listRef.current?.scrollTo({ top: listRef.current.scrollHeight })
-      );
     });
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-      <div>
-        <h3 className="flex items-center gap-2 font-semibold text-zinc-900 dark:text-zinc-50">
-          <MessageCircle className="h-4 w-4 text-emerald-600" />
-          Consultá lo que quieras (sobre comida)
-        </h3>
-        <p className="text-sm text-zinc-500">
-          Dudas de alimentación, snacks, antojos, qué te conviene comer.
-        </p>
-      </div>
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Mensajes */}
+      <div className="flex-1 space-y-3 overflow-y-auto rounded-2xl bg-zinc-100/60 p-3 dark:bg-zinc-900/40">
+        {messages.length === 0 && (
+          <div className="flex h-full flex-col items-center justify-center gap-4 px-4 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40">
+              <Leaf className="h-7 w-7" />
+            </div>
+            <p className="text-sm text-zinc-500">
+              Preguntame lo que quieras sobre comida. Probá con:
+            </p>
+            <div className="flex w-full max-w-sm flex-col gap-2">
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => send(s)}
+                  disabled={pending}
+                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-left text-sm text-zinc-600 transition hover:border-emerald-400 hover:text-zinc-900 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
-      {messages.length === 0 && (
-        <div className="flex flex-col gap-2">
-          {SUGGESTIONS.map((s) => (
-            <button
-              key={s}
-              onClick={() => send(s)}
-              disabled={pending}
-              className="rounded-lg border border-zinc-200 px-3 py-2 text-left text-sm text-zinc-600 transition hover:border-emerald-400 hover:text-zinc-900 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-100"
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {messages.length > 0 && (
-        <div
-          ref={listRef}
-          className="flex max-h-80 flex-col gap-3 overflow-y-auto"
-        >
-          {messages.map((m, i) => (
+        {messages.map((m, i) => (
+          <div
+            key={i}
+            className={`flex items-end gap-2 ${
+              m.role === "user" ? "justify-end" : "justify-start"
+            }`}
+          >
+            {m.role === "assistant" && (
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40">
+                <Leaf className="h-4 w-4" />
+              </div>
+            )}
             <div
-              key={i}
-              className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
+              className={`max-w-[78%] px-3 py-2 text-sm shadow-sm ${
                 m.role === "user"
-                  ? "self-end bg-emerald-600 text-white"
-                  : "self-start bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200"
+                  ? "rounded-2xl rounded-br-md bg-emerald-600 text-white"
+                  : "rounded-2xl rounded-bl-md bg-white text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
               }`}
             >
               {m.role === "assistant" ? (
                 <Markdown>{m.content}</Markdown>
               ) : (
-                m.content
+                <span className="whitespace-pre-wrap">{m.content}</span>
               )}
+              <span
+                className={`mt-1 block text-right text-[10px] ${
+                  m.role === "user" ? "text-white/70" : "text-zinc-400"
+                }`}
+              >
+                {m.time}
+              </span>
             </div>
-          ))}
-          {pending && (
-            <div className="self-start rounded-2xl bg-zinc-100 px-3 py-2 text-sm text-zinc-500 dark:bg-zinc-800">
-              <span className="inline-flex gap-1">
+          </div>
+        ))}
+
+        {pending && (
+          <div className="flex items-end gap-2">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40">
+              <Leaf className="h-4 w-4" />
+            </div>
+            <div className="rounded-2xl rounded-bl-md bg-white px-3 py-3 dark:bg-zinc-800">
+              <span className="flex gap-1">
                 <Dot /> <Dot /> <Dot />
               </span>
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+        <div ref={bottomRef} />
+      </div>
 
+      {error && <p className="px-1 pt-2 text-sm text-red-600">{error}</p>}
+
+      {/* Composer */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
           send(input);
         }}
-        className="flex items-end gap-2"
+        className="flex items-end gap-2 pt-3"
       >
         <textarea
           value={input}
@@ -127,21 +164,21 @@ export default function ChatBox() {
             }
           }}
           rows={1}
-          placeholder="Escribí tu consulta sobre comida…"
-          className="flex-1 resize-none rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900"
+          placeholder="Escribí tu consulta…"
+          className="max-h-28 flex-1 resize-none rounded-3xl border border-zinc-300 bg-white px-4 py-2.5 text-sm outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900"
         />
         <button
           type="submit"
           disabled={pending || !input.trim()}
-          className="h-10 rounded-lg bg-emerald-600 px-4 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-50"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white transition hover:bg-emerald-700 disabled:opacity-40"
+          aria-label="Enviar"
         >
-          Enviar
+          <Send className="h-5 w-5" />
         </button>
       </form>
 
-      <p className="text-[11px] text-zinc-400">
-        Asistente acotado a nutrición. No es consejo médico: ante dudas de salud,
-        consultá a un profesional.
+      <p className="pt-2 text-center text-[11px] text-zinc-400">
+        Asistente acotado a nutrición. No es consejo médico.
       </p>
     </div>
   );
@@ -149,6 +186,6 @@ export default function ChatBox() {
 
 function Dot() {
   return (
-    <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400" />
+    <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-zinc-400" />
   );
 }

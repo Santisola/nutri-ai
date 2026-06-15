@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { ImagePlus, X } from "lucide-react";
+import { Camera, ImagePlus, X } from "lucide-react";
 import { analyzeMealPhoto, saveAnalyzedMeal } from "./actions";
 import { macrosFor, type AnalyzedItem } from "@/lib/nutrition/foods";
 
@@ -62,7 +62,8 @@ export default function PhotoMeal() {
   const [analyzing, startAnalyze] = useTransition();
   const [saving, startSave] = useTransition();
   const [step, setStep] = useState(0);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
 
   // Cicla los mensajes de carga mientras analiza (~20-40s en modelo free).
   useEffect(() => {
@@ -78,7 +79,8 @@ export default function PhotoMeal() {
   }, [analyzing]);
 
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
+    const input = e.target;
+    const files = Array.from(input.files ?? []);
     if (files.length === 0) return;
     setError(null);
     setItems(null);
@@ -95,7 +97,7 @@ export default function PhotoMeal() {
     } catch {
       setError("No se pudo procesar alguna imagen.");
     } finally {
-      if (fileRef.current) fileRef.current.value = "";
+      input.value = ""; // permite volver a elegir la misma foto
     }
   }
 
@@ -131,7 +133,8 @@ export default function PhotoMeal() {
     setDescription("");
     setItems(null);
     setError(null);
-    if (fileRef.current) fileRef.current.value = "";
+    if (cameraRef.current) cameraRef.current.value = "";
+    if (galleryRef.current) galleryRef.current.value = "";
   }
 
   function save() {
@@ -173,7 +176,7 @@ export default function PhotoMeal() {
       )}
 
       {/* Galería de fotos */}
-      {!items && (
+      {!items && images.length > 0 && (
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
           {images.map((src, idx) => (
             <div key={idx} className="relative aspect-square">
@@ -192,22 +195,37 @@ export default function PhotoMeal() {
               </button>
             </div>
           ))}
+        </div>
+      )}
 
-          {images.length < MAX_IMAGES && (
-            <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-emerald-300 text-center text-xs text-emerald-700 transition hover:bg-emerald-100/50 dark:border-emerald-800 dark:text-emerald-400">
-              <ImagePlus className="h-6 w-6" />
-              {images.length === 0 ? "Subí fotos" : "Agregar"}
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                multiple
-                onChange={onPick}
-                className="hidden"
-              />
-            </label>
-          )}
+      {/* Acciones de carga: cámara o galería */}
+      {!items && images.length < MAX_IMAGES && (
+        <div className="grid grid-cols-2 gap-2">
+          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-300 py-3 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100/50 dark:border-emerald-800 dark:text-emerald-400">
+            <Camera className="h-5 w-5" />
+            Cámara
+            <input
+              ref={cameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              multiple
+              onChange={onPick}
+              className="hidden"
+            />
+          </label>
+          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-300 py-3 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100/50 dark:border-emerald-800 dark:text-emerald-400">
+            <ImagePlus className="h-5 w-5" />
+            Galería
+            <input
+              ref={galleryRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={onPick}
+              className="hidden"
+            />
+          </label>
         </div>
       )}
 

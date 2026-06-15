@@ -303,12 +303,13 @@ export async function suggestNextMeal(
 }
 
 // ── Chat de nutrición (restringido y validado) ─────────────────────────────
-const MAX_MSG_LEN = 600;
+const MAX_MSG_LEN = 600; // tope para el mensaje del usuario
+const MAX_ASSISTANT_LEN = 8000; // las respuestas del asistente pueden ser largas
 const MAX_HISTORY = 8; // mensajes previos que mandamos como contexto
 
 const chatMessageSchema = z.object({
   role: z.enum(["user", "assistant"]),
-  content: z.string().min(1).max(MAX_MSG_LEN),
+  content: z.string().min(1).max(MAX_ASSISTANT_LEN),
 });
 const chatHistorySchema = z.array(chatMessageSchema).min(1).max(40);
 
@@ -326,15 +327,19 @@ export async function sendChatMessage(
     };
   }
 
-  // Validación de forma y longitud.
+  // Validación de forma.
   const parsed = chatHistorySchema.safeParse(history);
   if (!parsed.success) {
-    return { error: "Mensaje inválido o demasiado largo (máx 600 caracteres)." };
-  }
-  // El último mensaje debe ser del usuario.
-  const safeHistory = parsed.data.slice(-MAX_HISTORY);
-  if (safeHistory[safeHistory.length - 1].role !== "user") {
     return { error: "Mensaje inválido." };
+  }
+  const safeHistory = parsed.data.slice(-MAX_HISTORY);
+  const last = safeHistory[safeHistory.length - 1];
+  // El último mensaje debe ser tuyo y respetar el límite de longitud.
+  if (last.role !== "user") {
+    return { error: "Mensaje inválido." };
+  }
+  if (last.content.length > MAX_MSG_LEN) {
+    return { error: `Tu mensaje es muy largo (máx ${MAX_MSG_LEN} caracteres).` };
   }
 
   const ctx = await getUserNutritionContext(userId);
@@ -354,7 +359,7 @@ export async function sendChatMessage(
         reply: {
           onTopic: false,
           answer:
-            "Solo puedo ayudarte con dudas sobre nutrición y alimentación. ¿Qué querés comer o consultar?",
+            "Eso se me escapó del plato. Lo mío es la comida: ¿qué querés comer o consultar?",
         },
       };
     }
