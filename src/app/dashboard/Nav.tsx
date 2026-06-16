@@ -10,6 +10,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import PhotoFab from "./PhotoFab";
+import { useNav } from "./NavProgress";
 
 const TABS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/dashboard", label: "Hoy", icon: Apple },
@@ -26,12 +27,17 @@ function useActive() {
 
 export function TopNav() {
   const isActive = useActive();
+  const { navigate } = useNav();
   return (
     <nav className="hidden items-center gap-1 md:flex">
       {TABS.map((t) => (
         <Link
           key={t.href}
           href={t.href}
+          onClick={(e) => {
+            e.preventDefault();
+            navigate(t.href);
+          }}
           className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
             isActive(t.href)
               ? "bg-emerald-600 text-white"
@@ -53,9 +59,14 @@ function BottomTab({
   active: boolean;
 }) {
   const Icon = tab.icon;
+  const { navigate } = useNav();
   return (
     <Link
       href={tab.href}
+      onClick={(e) => {
+        e.preventDefault();
+        navigate(tab.href);
+      }}
       className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs font-medium transition ${
         active ? "text-emerald-600" : "text-zinc-500 dark:text-zinc-400"
       }`}
