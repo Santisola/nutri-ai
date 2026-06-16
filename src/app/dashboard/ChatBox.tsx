@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Send, Leaf } from "lucide-react";
+import Link from "next/link";
+import { Send, Leaf, ClipboardCheck } from "lucide-react";
 import { sendChatMessage } from "./actions";
 import type { ChatMessage } from "@/lib/ai/types";
 import Markdown from "@/components/Markdown";
@@ -27,6 +28,7 @@ export default function ChatBox() {
   const [messages, setMessages] = useState<UIMessage[]>([]);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [planUpdated, setPlanUpdated] = useState(false);
   const [pending, start] = useTransition();
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -42,6 +44,7 @@ export default function ChatBox() {
       return;
     }
     setError(null);
+    setPlanUpdated(false);
     const next: UIMessage[] = [
       ...messages,
       { role: "user", content, time: now() },
@@ -63,6 +66,7 @@ export default function ChatBox() {
         ...prev,
         { role: "assistant", content: res.reply!.answer, time: now() },
       ]);
+      if (res.planUpdated) setPlanUpdated(true);
     });
   }
 
@@ -138,6 +142,18 @@ export default function ChatBox() {
                 <Dot /> <Dot /> <Dot />
               </span>
             </div>
+          </div>
+        )}
+
+        {planUpdated && (
+          <div className="flex justify-center">
+            <Link
+              href="/dashboard/plan"
+              className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700 transition hover:bg-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400"
+            >
+              <ClipboardCheck className="h-3.5 w-3.5" />
+              Tu plan fue actualizado · Verlo
+            </Link>
           </div>
         )}
 

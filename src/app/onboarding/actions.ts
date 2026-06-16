@@ -27,5 +27,6 @@ export async function saveProfile(
       set: { ...values, updatedAt: new Date() },
     });
 
-  redirect("/dashboard");
+  // Tras el onboarding lo mandamos a Plan, que genera su guía automáticamente.
+  redirect("/dashboard/plan");
 }

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { Camera, ImagePlus, X } from "lucide-react";
 import { analyzeMealPhoto, saveAnalyzedMeal } from "./actions";
 import { macrosFor, type AnalyzedItem } from "@/lib/nutrition/foods";
+import { fileToScaledDataUrl, takePendingPhotos, PHOTOS_EVENT } from "@/lib/image";
 
 const MAX_IMAGES = 5;
 
@@ -22,33 +23,6 @@ const LOADING_STEPS = [
   "Casi listo…",
 ];
 
-// Redimensiona a máx 1000px y exporta JPEG para no exceder el límite de
-// los server actions y acelerar el análisis.
-function fileToScaledDataUrl(file: File, max = 1000): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const scale = Math.min(1, max / Math.max(img.width, img.height));
-      const w = Math.round(img.width * scale);
-      const h = Math.round(img.height * scale);
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return reject(new Error("No canvas context"));
-      ctx.drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL("image/jpeg", 0.8));
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("No se pudo leer la imagen"));
-    };
-    img.src = url;
-  });
-}
-
 function scale(item: AnalyzedItem) {
   return macrosFor(item);
 }
@@ -64,6 +38,19 @@ export default function PhotoMeal() {
   const [step, setStep] = useState(0);
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
+
+  // Toma las fotos que llegan desde el FAB del navbar (en el mount y por evento).
+  useEffect(() => {
+    const load = () => {
+      const pend = takePendingPhotos();
+      if (pend.length === 0) return;
+      setItems(null);
+      setImages((prev) => [...prev, ...pend].slice(0, MAX_IMAGES));
+    };
+    load();
+    window.addEventListener(PHOTOS_EVENT, load);
+    return () => window.removeEventListener(PHOTOS_EVENT, load);
+  }, []);
 
   // Cicla los mensajes de carga mientras analiza (~20-40s en modelo free).
   useEffect(() => {

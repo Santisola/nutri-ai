@@ -1,12 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Camera, Pencil } from "lucide-react";
 import PhotoMeal from "./PhotoMeal";
 import AddMealForm from "./AddMealForm";
+import { PHOTOS_EVENT } from "@/lib/image";
 
 export default function AddFood() {
   const [tab, setTab] = useState<"photo" | "manual">("photo");
+
+  // Si llegan fotos desde el FAB, asegurarse de mostrar la pestaña de foto.
+  useEffect(() => {
+    const toPhoto = () => setTab("photo");
+    window.addEventListener(PHOTOS_EVENT, toPhoto);
+    return () => window.removeEventListener(PHOTOS_EVENT, toPhoto);
+  }, []);
 
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">

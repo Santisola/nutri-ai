@@ -92,14 +92,29 @@ export interface ChatContext {
   dietaryPrefs: string[];
   allergies: string[];
   dislikes: string[];
+  plan?: string | null; // plan nutricional actual (markdown), si existe
 }
 
 // Respuesta del chat. Fail-closed: si no se puede determinar, onTopic = false.
 export const chatReplySchema = z.object({
   onTopic: z.coerce.boolean().catch(false),
   answer: z.string().catch(""),
+  // true cuando el usuario pidió modificar su plan nutricional.
+  modifyPlan: z.coerce.boolean().catch(false),
 });
 export type ChatReply = z.infer<typeof chatReplySchema>;
+
+// Contexto para generar/modificar el plan nutricional.
+export interface PlanContext {
+  goalType: "lose" | "maintain" | "gain";
+  targets: { kcal: number; protein: number; carb: number; fat: number };
+  weightKg: number;
+  targetWeightKg?: number | null;
+  activityLevel: string;
+  dietaryPrefs: string[];
+  allergies: string[];
+  dislikes: string[];
+}
 
 export interface TextProvider {
   suggestMeal(ctx: MealSuggestionContext): Promise<MealSuggestion>;
@@ -110,4 +125,12 @@ export interface TextProvider {
     history: ChatMessage[],
     context: ChatContext
   ): Promise<ChatReply>;
+  /** Genera un plan/guía nutricional en markdown según el perfil y objetivo. */
+  generatePlan(ctx: PlanContext): Promise<string>;
+  /** Devuelve el plan completo actualizado aplicando una instrucción del usuario. */
+  modifyPlan(
+    currentPlan: string,
+    instruction: string,
+    ctx: PlanContext
+  ): Promise<string>;
 }

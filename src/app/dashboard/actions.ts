@@ -23,7 +23,10 @@ import {
   getDayMeals,
   sumDay,
   getLatestWeight,
+  getPlan,
 } from "@/lib/queries";
+import { buildPlanContext } from "@/lib/nutrition/context";
+import { nutritionPlans } from "@/db/schema";
 import {
   calcTargets,
   ageFromBirthYear,
@@ -315,7 +318,7 @@ const chatHistorySchema = z.array(chatMessageSchema).min(1).max(40);
 
 export async function sendChatMessage(
   history: ChatMessage[]
-): Promise<{ reply?: ChatReply; error?: string }> {
+): Promise<{ reply?: ChatReply; error?: string; planUpdated?: boolean }> {
   const userId = await getCurrentUserId();
   if (!userId) return { error: "No autenticado" };
 
@@ -345,6 +348,8 @@ export async function sendChatMessage(
   const ctx = await getUserNutritionContext(userId);
   if (!ctx) return { error: "Completá tu perfil primero" };
 
+  const plan = await getPlan(userId);
+
   try {
     const reply = await getTextProvider().nutritionChat(safeHistory, {
       goalType: ctx.goalType,
@@ -352,6 +357,7 @@ export async function sendChatMessage(
       dietaryPrefs: ctx.dietaryPrefs,
       allergies: ctx.allergies,
       dislikes: ctx.dislikes,
+      plan: plan?.content ?? null,
     });
     // Salvaguarda extra: si el modelo devolvió onTopic pero answer vacío.
     if (!reply.answer.trim()) {
@@ -360,10 +366,40 @@ export async function sendChatMessage(
           onTopic: false,
           answer:
             "Eso se me escapó del plato. Lo mío es la comida: ¿qué querés comer o consultar?",
+          modifyPlan: false,
         },
       };
     }
-    return { reply };
+
+    // Si pidió modificar el plan y tiene uno, lo procesamos y guardamos.
+    let planUpdated = false;
+    if (reply.modifyPlan && plan) {
+      try {
+        const planCtx = await buildPlanContext(userId);
+        if (planCtx) {
+          const updated = await getTextProvider().modifyPlan(
+            plan.content,
+            last.content,
+            planCtx
+          );
+          if (updated.trim()) {
+            await db
+              .insert(nutritionPlans)
+              .values({ userId, content: updated })
+              .onConflictDoUpdate({
+                target: nutritionPlans.userId,
+                set: { content: updated, updatedAt: new Date() },
+              });
+            revalidatePath("/dashboard/plan");
+            planUpdated = true;
+          }
+        }
+      } catch {
+        // Si falla la modificación, el chat igual respondió; avisamos abajo.
+      }
+    }
+
+    return { reply, planUpdated };
   } catch (e) {
     return { error: aiErrorMessage(e) };
   }

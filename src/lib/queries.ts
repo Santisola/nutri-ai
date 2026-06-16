@@ -1,6 +1,12 @@
 import "server-only";
 import { db } from "@/db";
-import { profiles, mealLogs, mealLogItems, weightLogs } from "@/db/schema";
+import {
+  profiles,
+  mealLogs,
+  mealLogItems,
+  weightLogs,
+  nutritionPlans,
+} from "@/db/schema";
 import { and, desc, eq } from "drizzle-orm";
 import { auth } from "@/auth";
 
@@ -63,6 +69,15 @@ export async function getLatestWeight(userId: string) {
     .from(weightLogs)
     .where(eq(weightLogs.userId, userId))
     .orderBy(desc(weightLogs.date))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getPlan(userId: string) {
+  const rows = await db
+    .select()
+    .from(nutritionPlans)
+    .where(eq(nutritionPlans.userId, userId))
     .limit(1);
   return rows[0] ?? null;
 }
