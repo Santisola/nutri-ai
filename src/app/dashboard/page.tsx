@@ -8,13 +8,7 @@ import {
   getWeightHistory,
 } from "@/lib/queries";
 import { todayISO, formatDayLabel } from "@/lib/date";
-import {
-  calcTargets,
-  ageFromBirthYear,
-  type Sex,
-  type ActivityLevel,
-  type GoalType,
-} from "@/lib/nutrition/targets";
+import { getEffectiveTargets } from "@/lib/nutrition/targets-effective";
 import { Beef, Wheat, Droplet, type LucideIcon } from "lucide-react";
 import AddFood from "./AddFood";
 import MealList from "./MealList";
@@ -42,15 +36,7 @@ export default async function DashboardPage() {
   const consumed = sumDay(meals);
   const currentWeight = latestWeight?.weightKg ?? profile.weightKg;
 
-  const targets = calcTargets({
-    sex: profile.sex as Sex,
-    age: ageFromBirthYear(profile.birthYear),
-    heightCm: profile.heightCm,
-    weightKg: currentWeight,
-    activityLevel: profile.activityLevel as ActivityLevel,
-    goalType: profile.goalType as GoalType,
-    goalRateKgPerWeek: profile.goalRateKgPerWeek,
-  });
+  const targets = (await getEffectiveTargets(userId))!;
 
   const remaining = Math.max(0, targets.kcal - consumed.kcal);
   const pct = Math.min(100, Math.round((consumed.kcal / targets.kcal) * 100));

@@ -115,6 +115,21 @@ export const chatReplySchema = z.object({
 });
 export type ChatReply = z.infer<typeof chatReplySchema>;
 
+// Objetivos extraídos de un plan importado (PDF). `found` = el PDF los tenía.
+export const importedTargetsSchema = z.object({
+  found: z.coerce.boolean().catch(false),
+  kcal: z.coerce.number().nonnegative().catch(0),
+  protein: z.coerce.number().nonnegative().catch(0),
+  carb: z.coerce.number().nonnegative().catch(0),
+  fat: z.coerce.number().nonnegative().catch(0),
+});
+export type ImportedTargets = {
+  kcal: number;
+  protein: number;
+  carb: number;
+  fat: number;
+} | null;
+
 // Contexto para generar/modificar el plan nutricional.
 export interface PlanContext {
   goalType: "lose" | "maintain" | "gain";
@@ -140,6 +155,10 @@ export interface TextProvider {
   ): Promise<ChatReply>;
   /** Genera un plan/guía nutricional en markdown según el perfil y objetivo. */
   generatePlan(ctx: PlanContext): Promise<string>;
+  /** Reformatea el texto de un plan importado (PDF) al markdown de la app, fielmente. */
+  importPlanFromText(rawText: string): Promise<string>;
+  /** Extrae los objetivos (kcal/macros) del texto de un plan importado, o null. */
+  extractTargetsFromText(rawText: string): Promise<ImportedTargets>;
   /** Devuelve el plan completo actualizado aplicando una instrucción del usuario. */
   modifyPlan(
     currentPlan: string,

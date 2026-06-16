@@ -31,7 +31,11 @@ export default async function PlanPage() {
         </p>
       </header>
 
-      <PlanView initialContent={plan?.content ?? null} updatedAt={updatedAt} />
+      <PlanView
+        initialContent={plan?.content ?? null}
+        initialSource={(plan?.source as "generated" | "imported") ?? "generated"}
+        updatedAt={updatedAt}
+      />
     </div>
   );
 }

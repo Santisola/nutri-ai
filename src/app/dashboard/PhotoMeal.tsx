@@ -54,10 +54,7 @@ export default function PhotoMeal() {
 
   // Cicla los mensajes de carga mientras analiza (~20-40s en modelo free).
   useEffect(() => {
-    if (!analyzing) {
-      setStep(0);
-      return;
-    }
+    if (!analyzing) return;
     const id = setInterval(
       () => setStep((s) => Math.min(s + 1, LOADING_STEPS.length - 1)),
       5000
@@ -95,6 +92,7 @@ export default function PhotoMeal() {
   function analyze() {
     if (images.length === 0) return;
     setError(null);
+    setStep(0);
     startAnalyze(async () => {
       const res = await analyzeMealPhoto({ images, description });
       if (res.error || !res.items) {

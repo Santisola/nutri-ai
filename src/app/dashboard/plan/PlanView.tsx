@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { RefreshCw, MessageCircle, Sparkles } from "lucide-react";
+import { RefreshCw, MessageCircle, Sparkles, FileCheck } from "lucide-react";
 import { generateMyPlan } from "./actions";
+import ImportPdf from "./ImportPdf";
 import Markdown from "@/components/Markdown";
 
 const LOADING = [
@@ -15,12 +16,17 @@ const LOADING = [
 
 export default function PlanView({
   initialContent,
+  initialSource,
   updatedAt,
 }: {
   initialContent: string | null;
+  initialSource?: "generated" | "imported";
   updatedAt?: string;
 }) {
   const [content, setContent] = useState(initialContent);
+  const [source, setSource] = useState<"generated" | "imported">(
+    initialSource ?? "generated"
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [step, setStep] = useState(0);
@@ -28,6 +34,7 @@ export default function PlanView({
 
   function generate() {
     setError(null);
+    setStep(0);
     start(async () => {
       const res = await generateMyPlan();
       if (res.error || !res.content) {
@@ -35,7 +42,13 @@ export default function PlanView({
         return;
       }
       setContent(res.content);
+      setSource("generated");
     });
+  }
+
+  function onImported(newContent: string) {
+    setContent(newContent);
+    setSource("imported");
   }
 
   // Genera automáticamente la primera vez si todavía no hay plan.
@@ -48,10 +61,7 @@ export default function PlanView({
   }, []);
 
   useEffect(() => {
-    if (!pending) {
-      setStep(0);
-      return;
-    }
+    if (!pending) return;
     const id = setInterval(
       () => setStep((s) => Math.min(s + 1, LOADING.length - 1)),
       5000
@@ -91,12 +101,24 @@ export default function PlanView({
         >
           Generar mi plan
         </button>
+        <div className="flex items-center gap-3 text-xs text-zinc-400">
+          <span className="h-px w-8 bg-zinc-200 dark:bg-zinc-700" /> o{" "}
+          <span className="h-px w-8 bg-zinc-200 dark:bg-zinc-700" />
+        </div>
+        <ImportPdf variant="secondary" onSaved={onImported} />
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-4">
+      {source === "imported" && (
+        <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+          <FileCheck className="h-3.5 w-3.5" />
+          Importado de tu nutricionista
+        </span>
+      )}
+
       <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
         <Markdown>{content}</Markdown>
       </div>
@@ -116,9 +138,11 @@ export default function PlanView({
           className="inline-flex items-center justify-center gap-2 rounded-full border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
         >
           <RefreshCw className="h-4 w-4" />
-          Regenerar
+          Regenerar con IA
         </button>
       </div>
+
+      <ImportPdf variant="secondary" onSaved={onImported} />
 
       {updatedAt && (
         <p className="text-xs text-zinc-400">Actualizado el {updatedAt}.</p>

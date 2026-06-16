@@ -143,11 +143,18 @@ export const weightLogs = pgTable("weight_log", {
   weightKg: real("weightKg").notNull(),
 });
 
-// Plan/guía nutricional personalizado generado por IA. Uno por usuario.
+// Plan/guía nutricional personalizado. Uno por usuario.
 export const nutritionPlans = pgTable("nutrition_plan", {
   userId: text("userId")
     .primaryKey()
     .references(() => users.id, { onDelete: "cascade" }),
   content: text("content").notNull(), // markdown
+  // "generated" (IA) | "imported" (PDF de nutricionista)
+  source: text("source").notNull().default("generated"),
+  // Objetivos del plan importado (null = usar los calculados por la fórmula).
+  kcal: real("kcal"),
+  protein: real("protein"),
+  carb: real("carb"),
+  fat: real("fat"),
   updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
 });

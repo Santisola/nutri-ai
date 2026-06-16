@@ -11,11 +11,13 @@ import {
   type ChatContext,
   type ChatReply,
   type PlanContext,
+  type ImportedTargets,
   visionResultSchema,
   mealSuggestionSchema,
   macroEstimateSchema,
   foodTextEstimateSchema,
   chatReplySchema,
+  importedTargetsSchema,
 } from "./types";
 
 /**
@@ -295,6 +297,70 @@ ${PLAN_FORMAT}`;
     });
 
     return stripFences(firstContent(res));
+  }
+
+  async importPlanFromText(rawText: string): Promise<string> {
+    const model = process.env.AI_TEXT_MODEL;
+    if (!model) throw new Error("AI_TEXT_MODEL no está definida");
+
+    const prompt = `Te paso el TEXTO de un plan de alimentación hecho por un nutricionista (extraído de un PDF). Reescribilo en markdown prolijo y bien organizado, SIN inventar nada.
+
+REGLAS:
+- Replicá FIELMENTE el contenido del plan: comidas, alimentos, cantidades, horarios e indicaciones tal como aparecen.
+- NO inventes alimentos, números ni secciones que no estén en el texto.
+- Si el texto está desordenado (por la extracción del PDF), reorganizalo de forma clara, pero sin cambiar el contenido.
+- Usá encabezados markdown (\`##\`), listas y, si corresponde, tablas. Mantené las indicaciones del profesional.
+- Agregá al final una línea: "_Plan importado. No reemplaza el seguimiento de tu profesional._"
+- Devolvé SOLO el markdown, sin texto extra antes ni después, sin bloque de código.
+
+TEXTO DEL PLAN:
+"""
+${rawText}
+"""`;
+
+    const res = await client().chat.completions.create({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
+      max_tokens: 1800,
+    });
+
+    return stripFences(firstContent(res));
+  }
+
+  async extractTargetsFromText(rawText: string): Promise<ImportedTargets> {
+    const model = process.env.AI_TEXT_MODEL;
+    if (!model) throw new Error("AI_TEXT_MODEL no está definida");
+
+    const prompt = `Analizá el texto de un plan nutricional y extraé, si están EXPLÍCITOS, los objetivos diarios totales.
+Devolvé SOLO un JSON con esta forma exacta:
+{"found": true|false, "kcal": <número>, "protein": <gramos>, "carb": <gramos>, "fat": <gramos>}
+- found=true SOLO si el plan indica calorías diarias totales (o macros). Si no figuran, found=false y todo en 0.
+- No estimes ni inventes: si no está escrito, found=false.
+
+TEXTO:
+"""
+${rawText}
+"""`;
+
+    const res = await client().chat.completions.create({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.1,
+    });
+
+    try {
+      const parsed = importedTargetsSchema.parse(extractJson(firstContent(res)));
+      if (!parsed.found || parsed.kcal <= 0) return null;
+      return {
+        kcal: Math.round(parsed.kcal),
+        protein: Math.round(parsed.protein),
+        carb: Math.round(parsed.carb),
+        fat: Math.round(parsed.fat),
+      };
+    } catch {
+      return null;
+    }
   }
 
   async modifyPlan(

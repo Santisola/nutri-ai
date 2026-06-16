@@ -1,15 +1,9 @@
 import { redirect } from "next/navigation";
 import { Flame, Beef, Wheat, Droplet, type LucideIcon } from "lucide-react";
-import { getCurrentUserId, getProfile, getLatestWeight } from "@/lib/queries";
+import { getCurrentUserId, getProfile } from "@/lib/queries";
 import ProfileForm from "@/components/ProfileForm";
 import { updateProfile } from "./actions";
-import {
-  calcTargets,
-  ageFromBirthYear,
-  type Sex,
-  type ActivityLevel,
-  type GoalType,
-} from "@/lib/nutrition/targets";
+import { getEffectiveTargets } from "@/lib/nutrition/targets-effective";
 
 export default async function PerfilPage() {
   const userId = await getCurrentUserId();
@@ -18,16 +12,8 @@ export default async function PerfilPage() {
   const profile = await getProfile(userId);
   if (!profile) redirect("/onboarding");
 
-  const latestWeight = await getLatestWeight(userId);
-  const targets = calcTargets({
-    sex: profile.sex as Sex,
-    age: ageFromBirthYear(profile.birthYear),
-    heightCm: profile.heightCm,
-    weightKg: latestWeight?.weightKg ?? profile.weightKg,
-    activityLevel: profile.activityLevel as ActivityLevel,
-    goalType: profile.goalType as GoalType,
-    goalRateKgPerWeek: profile.goalRateKgPerWeek,
-  });
+  const targets = (await getEffectiveTargets(userId))!;
+  const imported = targets.source === "imported";
 
   return (
     <div className="mx-auto h-full max-w-2xl space-y-6 overflow-y-auto px-5 py-6">
@@ -36,8 +22,10 @@ export default async function PerfilPage() {
           Tu perfil
         </h1>
         <p className="text-sm text-zinc-500">
-          Editá tus datos, objetivo y preferencias. Tu objetivo diario se
-          recalcula automáticamente.
+          Editá tus datos, objetivo y preferencias.
+          {imported
+            ? " Tu objetivo activo viene de tu plan importado."
+            : " Tu objetivo diario se recalcula automáticamente."}
         </p>
       </header>
 
@@ -48,6 +36,13 @@ export default async function PerfilPage() {
         <Stat icon={Wheat} label="Carbos" value={`${targets.carb}`} unit="g" />
         <Stat icon={Droplet} label="Grasas" value={`${targets.fat}`} unit="g" />
       </section>
+
+      {imported && (
+        <p className="-mt-3 text-xs text-amber-600">
+          Objetivo según tu plan importado. Si querés volver al cálculo
+          automático, regenerá tu plan desde la sección Plan.
+        </p>
+      )}
 
       <section className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
         <ProfileForm

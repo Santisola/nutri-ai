@@ -22,18 +22,12 @@ import {
   getProfile,
   getDayMeals,
   sumDay,
-  getLatestWeight,
   getPlan,
 } from "@/lib/queries";
 import { buildPlanContext } from "@/lib/nutrition/context";
+import { getEffectiveTargets } from "@/lib/nutrition/targets-effective";
 import { nutritionPlans } from "@/db/schema";
-import {
-  calcTargets,
-  ageFromBirthYear,
-  type Sex,
-  type ActivityLevel,
-  type GoalType,
-} from "@/lib/nutrition/targets";
+import { type GoalType } from "@/lib/nutrition/targets";
 import type { MealSuggestion, ChatMessage, ChatReply } from "@/lib/ai/types";
 import { todayISO, currentMealType, type MealType } from "@/lib/date";
 import { rateLimit } from "@/lib/rate-limit";
@@ -284,21 +278,9 @@ async function getUserNutritionContext(userId: string) {
   const profile = await getProfile(userId);
   if (!profile) return null;
 
-  const [meals, latestWeight] = await Promise.all([
-    getDayMeals(userId, todayISO()),
-    getLatestWeight(userId),
-  ]);
+  const meals = await getDayMeals(userId, todayISO());
   const consumed = sumDay(meals);
-
-  const targets = calcTargets({
-    sex: profile.sex as Sex,
-    age: ageFromBirthYear(profile.birthYear),
-    heightCm: profile.heightCm,
-    weightKg: latestWeight?.weightKg ?? profile.weightKg,
-    activityLevel: profile.activityLevel as ActivityLevel,
-    goalType: profile.goalType as GoalType,
-    goalRateKgPerWeek: profile.goalRateKgPerWeek,
-  });
+  const targets = (await getEffectiveTargets(userId))!;
 
   return {
     goalType: profile.goalType as GoalType,
