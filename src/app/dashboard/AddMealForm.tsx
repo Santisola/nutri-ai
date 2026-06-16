@@ -1,11 +1,9 @@
 "use client";
 
 import { useState, useTransition, useRef } from "react";
-import { X } from "lucide-react";
-import { searchFoods, addMeal } from "./actions";
-import type { Food } from "@/lib/nutrition/foods";
-
-type Item = { food: Food; grams: number };
+import { X, Sparkles } from "lucide-react";
+import { searchFoods, estimateManualFood, saveAnalyzedMeal } from "./actions";
+import { macrosFor, type Food, type AnalyzedItem } from "@/lib/nutrition/foods";
 
 const MEAL_TYPES = [
   { value: "breakfast", label: "Desayuno" },
@@ -14,22 +12,13 @@ const MEAL_TYPES = [
   { value: "snack", label: "Snack" },
 ] as const;
 
-function scale(food: Food, grams: number) {
-  const f = grams / 100;
-  return {
-    kcal: Math.round(food.kcalPer100g * f),
-    protein: Math.round(food.proteinPer100g * f),
-    carb: Math.round(food.carbPer100g * f),
-    fat: Math.round(food.fatPer100g * f),
-  };
-}
-
 export default function AddMealForm() {
   const [mealType, setMealType] = useState<string>("lunch");
-  const [items, setItems] = useState<Item[]>([]);
+  const [items, setItems] = useState<AnalyzedItem[]>([]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Food[]>([]);
   const [searching, startSearch] = useTransition();
+  const [estimating, startEstimate] = useTransition();
   const [saving, startSave] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -46,16 +35,46 @@ export default function AddMealForm() {
     }, 250);
   }
 
-  function addItem(food: Food) {
-    setItems((prev) => [...prev, { food, grams: 100 }]);
+  function addDbItem(food: Food) {
+    setItems((prev) => [
+      ...prev,
+      {
+        label: food.name,
+        grams: 100,
+        foodId: food.id,
+        kcalPer100g: food.kcalPer100g,
+        proteinPer100g: food.proteinPer100g,
+        carbPer100g: food.carbPer100g,
+        fatPer100g: food.fatPer100g,
+        source: "db",
+      },
+    ]);
     setQuery("");
     setResults([]);
   }
 
+  function addTextItem() {
+    const label = query.trim();
+    if (label.length < 2) return;
+    setError(null);
+    startEstimate(async () => {
+      const res = await estimateManualFood(label);
+      if (res.error || !res.item) {
+        setError(res.error ?? "No se pudo estimar.");
+        return;
+      }
+      const { grams, ...per100 } = res.item!;
+      setItems((prev) => [
+        ...prev,
+        { label, grams, foodId: null, ...per100, source: "ai" },
+      ]);
+      setQuery("");
+      setResults([]);
+    });
+  }
+
   function setGrams(idx: number, grams: number) {
-    setItems((prev) =>
-      prev.map((it, i) => (i === idx ? { ...it, grams } : it))
-    );
+    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, grams } : it)));
   }
 
   function removeItem(idx: number) {
@@ -64,7 +83,7 @@ export default function AddMealForm() {
 
   const total = items.reduce(
     (acc, it) => {
-      const m = scale(it.food, it.grams);
+      const m = macrosFor(it);
       return {
         kcal: acc.kcal + m.kcal,
         protein: acc.protein + m.protein,
@@ -82,10 +101,7 @@ export default function AddMealForm() {
       return;
     }
     startSave(async () => {
-      const res = await addMeal({
-        mealType,
-        items: items.map((it) => ({ foodId: it.food.id, grams: it.grams })),
-      });
+      const res = await saveAnalyzedMeal({ mealType, items, source: "manual" });
       if (res?.error) {
         setError(res.error);
         return;
@@ -93,6 +109,8 @@ export default function AddMealForm() {
       setItems([]);
     });
   }
+
+  const showDropdown = query.trim().length >= 2;
 
   return (
     <div className="flex flex-col gap-4">
@@ -116,10 +134,16 @@ export default function AddMealForm() {
         <input
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
-          placeholder="Buscar alimento (ej: fideos, pollo)…"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && results.length === 0) {
+              e.preventDefault();
+              addTextItem();
+            }
+          }}
+          placeholder="Buscar o describir (ej: 2 porciones de ñoquis con tuco)…"
           className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900"
         />
-        {(results.length > 0 || searching) && (
+        {showDropdown && (
           <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
             {searching && (
               <li className="px-3 py-2 text-sm text-zinc-400">Buscando…</li>
@@ -127,7 +151,7 @@ export default function AddMealForm() {
             {results.map((f) => (
               <li key={f.id}>
                 <button
-                  onClick={() => addItem(f)}
+                  onClick={() => addDbItem(f)}
                   className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-emerald-50 dark:hover:bg-zinc-700"
                 >
                   <span>{f.name}</span>
@@ -137,6 +161,25 @@ export default function AddMealForm() {
                 </button>
               </li>
             ))}
+
+            {!searching && results.length === 0 && (
+              <li className="px-3 py-2 text-xs text-zinc-400">
+                No está en la base. Estimalo con IA:
+              </li>
+            )}
+
+            <li className="border-t border-zinc-100 dark:border-zinc-700">
+              <button
+                onClick={addTextItem}
+                disabled={estimating}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-60 dark:text-emerald-400 dark:hover:bg-zinc-700"
+              >
+                <Sparkles className="h-4 w-4" />
+                {estimating
+                  ? "Estimando con IA…"
+                  : `Agregar “${query.trim()}” y estimar con IA`}
+              </button>
+            </li>
           </ul>
         )}
       </div>
@@ -144,13 +187,22 @@ export default function AddMealForm() {
       {items.length > 0 && (
         <ul className="flex flex-col gap-2">
           {items.map((it, idx) => {
-            const m = scale(it.food, it.grams);
+            const m = macrosFor(it);
             return (
               <li
                 key={idx}
                 className="flex items-center gap-3 rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800/50"
               >
-                <span className="flex-1 text-sm">{it.food.name}</span>
+                <div className="flex-1">
+                  <p className="text-sm">{it.label}</p>
+                  <span
+                    className={`text-[10px] font-medium uppercase ${
+                      it.source === "db" ? "text-emerald-600" : "text-amber-600"
+                    }`}
+                  >
+                    {it.source === "db" ? "base · preciso" : "estimación IA"}
+                  </span>
+                </div>
                 <input
                   type="number"
                   value={it.grams}
@@ -181,8 +233,8 @@ export default function AddMealForm() {
         <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2 text-sm dark:bg-emerald-950/30">
           <span className="font-medium">Total</span>
           <span>
-            {total.kcal} kcal · P {total.protein} · C {total.carb} · G{" "}
-            {total.fat}
+            {Math.round(total.kcal)} kcal · P {Math.round(total.protein)} · C{" "}
+            {Math.round(total.carb)} · G {Math.round(total.fat)}
           </span>
         </div>
       )}

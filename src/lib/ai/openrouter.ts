@@ -6,6 +6,7 @@ import {
   type MealSuggestion,
   type MealSuggestionContext,
   type MacroEstimate,
+  type FoodTextEstimate,
   type ChatMessage,
   type ChatContext,
   type ChatReply,
@@ -13,6 +14,7 @@ import {
   visionResultSchema,
   mealSuggestionSchema,
   macroEstimateSchema,
+  foodTextEstimateSchema,
   chatReplySchema,
 } from "./types";
 
@@ -184,6 +186,28 @@ Devolvé SOLO un JSON con esta forma exacta (un item por alimento, en el mismo o
 
     const text = firstContent(res);
     return macroEstimateSchema.parse(extractJson(text));
+  }
+
+  async estimateFoodFromText(description: string): Promise<FoodTextEstimate> {
+    const model = process.env.AI_TEXT_MODEL;
+    if (!model) throw new Error("AI_TEXT_MODEL no está definida");
+
+    const prompt = `El usuario describe un alimento o plato y, opcionalmente, una cantidad o porción (ej: "2 porciones de ñoquis con tuco", "un plato de ensalada", "3 milanesas").
+Descripción: "${description}".
+Estimá DOS cosas:
+1. El PESO TOTAL en gramos de lo que describió. Si no aclara cantidad, asumí UNA porción típica.
+2. Los valores nutricionales POR 100 GRAMOS del alimento.
+Devolvé SOLO un JSON con esta forma exacta (sin texto extra):
+{"grams":<número>,"kcalPer100g":<número>,"proteinPer100g":<número>,"carbPer100g":<número>,"fatPer100g":<número>}`;
+
+    const res = await client().chat.completions.create({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
+    });
+
+    const text = firstContent(res);
+    return foodTextEstimateSchema.parse(extractJson(text));
   }
 
   async nutritionChat(

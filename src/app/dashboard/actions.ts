@@ -44,6 +44,47 @@ export async function searchFoods(query: string): Promise<Food[]> {
   return searchFoodsQuery(query);
 }
 
+/**
+ * Estima un alimento descrito en texto libre (con cantidad opcional): peso total
+ * en gramos + macros por 100g. Luego el usuario puede refinar los gramos.
+ */
+export async function estimateManualFood(label: string): Promise<{
+  item?: {
+    grams: number;
+    kcalPer100g: number;
+    proteinPer100g: number;
+    carbPer100g: number;
+    fatPer100g: number;
+  };
+  error?: string;
+}> {
+  const userId = await getCurrentUserId();
+  if (!userId) return { error: "No autenticado" };
+
+  const name = label.trim();
+  if (name.length < 2) return { error: "Escribí el alimento." };
+
+  const rl = rateLimit(`estimate:${userId}`, 20, 60_000);
+  if (!rl.ok) {
+    return { error: "Esperá un momento antes de estimar otro alimento." };
+  }
+
+  try {
+    const e = await getTextProvider().estimateFoodFromText(name);
+    return {
+      item: {
+        grams: Math.round(e.grams),
+        kcalPer100g: e.kcalPer100g,
+        proteinPer100g: e.proteinPer100g,
+        carbPer100g: e.carbPer100g,
+        fatPer100g: e.fatPer100g,
+      },
+    };
+  } catch (e) {
+    return { error: aiErrorMessage(e) };
+  }
+}
+
 const addMealSchema = z.object({
   mealType: z.enum(["breakfast", "lunch", "dinner", "snack"]),
   items: z
@@ -179,19 +220,21 @@ const analyzedItemSchema = z.object({
 const saveAnalyzedSchema = z.object({
   mealType: z.enum(["breakfast", "lunch", "dinner", "snack"]),
   items: z.array(analyzedItemSchema).min(1),
+  source: z.enum(["ai", "manual"]).optional(),
 });
 
-/** Guarda la comida ya revisada/editada por el usuario (origen IA). */
+/** Guarda una comida revisada por el usuario (de foto-IA o carga manual). */
 export async function saveAnalyzedMeal(input: {
   mealType: string;
   items: AnalyzedItem[];
+  source?: "ai" | "manual";
 }) {
   const userId = await getCurrentUserId();
   if (!userId) return { error: "No autenticado" };
 
   const parsed = saveAnalyzedSchema.safeParse(input);
   if (!parsed.success) return { error: "Datos inválidos" };
-  const { mealType, items } = parsed.data;
+  const { mealType, items, source = "ai" } = parsed.data;
 
   const computed = items.map((it) => ({ ...it, m: macrosFor(it) }));
   const total = computed.reduce(
@@ -214,7 +257,7 @@ export async function saveAnalyzedMeal(input: {
       protein: total.protein,
       carb: total.carb,
       fat: total.fat,
-      source: "ai",
+      source,
     })
     .returning({ id: mealLogs.id });
 

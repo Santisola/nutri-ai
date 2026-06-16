@@ -13,8 +13,8 @@ type UIMessage = { role: "user" | "assistant"; content: string; time: string };
 
 const SUGGESTIONS = [
   "Tengo ansiedad y quiero picotear algo a media mañana, ¿qué me conviene?",
+  "Ajustá mi plan: agregá una colación a la tarde",
   "¿Qué puedo cenar liviano si ya comí mucho al mediodía?",
-  "Snacks con proteína fáciles para la oficina",
 ];
 
 function now(): string {
@@ -73,7 +73,11 @@ export default function ChatBox() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Mensajes */}
-      <div className="flex-1 space-y-3 overflow-y-auto rounded-2xl bg-zinc-100/60 p-3 dark:bg-zinc-900/40">
+      <div
+        className={`flex-1 space-y-3 rounded-2xl bg-zinc-100/60 p-3 dark:bg-zinc-900/40 ${
+          messages.length === 0 ? "overflow-hidden" : "overflow-y-auto"
+        }`}
+      >
         {messages.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-4 px-4 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40">

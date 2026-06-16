@@ -78,6 +78,17 @@ export const macroEstimateSchema = z.object({
 });
 export type MacroEstimate = z.infer<typeof macroEstimateSchema>;
 
+// Estimación de un alimento descrito en texto libre (con cantidad opcional):
+// peso total estimado + valores por 100g.
+export const foodTextEstimateSchema = z.object({
+  grams: z.coerce.number().positive().catch(100),
+  kcalPer100g: z.coerce.number().nonnegative().catch(0),
+  proteinPer100g: z.coerce.number().nonnegative().catch(0),
+  carbPer100g: z.coerce.number().nonnegative().catch(0),
+  fatPer100g: z.coerce.number().nonnegative().catch(0),
+});
+export type FoodTextEstimate = z.infer<typeof foodTextEstimateSchema>;
+
 /* ───── Chat de nutrición (restringido) ───── */
 
 export type ChatRole = "user" | "assistant";
@@ -120,6 +131,8 @@ export interface TextProvider {
   suggestMeal(ctx: MealSuggestionContext): Promise<MealSuggestion>;
   /** Estima kcal y macros por 100g para una lista de alimentos por nombre. */
   estimateMacrosPer100g(names: string[]): Promise<MacroEstimate>;
+  /** Estima peso total (g) y macros/100g de un alimento descrito en texto libre. */
+  estimateFoodFromText(description: string): Promise<FoodTextEstimate>;
   /** Chat restringido a consultas de nutrición/alimentación. */
   nutritionChat(
     history: ChatMessage[],
