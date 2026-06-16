@@ -15,8 +15,8 @@ export default async function DashboardLayout({
   if (!profile) redirect("/onboarding");
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
-      <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90">
+    <div className="flex h-[100dvh] flex-col bg-zinc-50 dark:bg-zinc-950">
+      <header className="shrink-0 border-b border-zinc-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90">
         <div className="mx-auto flex h-14 w-full max-w-2xl items-center justify-between px-5">
           <span className="text-lg font-bold tracking-tight text-emerald-600">
             NutriAI
@@ -35,9 +35,8 @@ export default async function DashboardLayout({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-2xl px-5 pb-28 pt-6 md:pb-12">
-        {children}
-      </main>
+      {/* El main no scrollea: cada página maneja su propio scroll interno. */}
+      <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
 
       <BottomNav />
     </div>

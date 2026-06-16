@@ -30,7 +30,7 @@ export default async function PerfilPage() {
   });
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto h-full max-w-2xl space-y-6 overflow-y-auto px-5 py-6">
       <header>
         <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
           Tu perfil

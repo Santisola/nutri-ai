@@ -57,7 +57,7 @@ export default async function DashboardPage() {
   const over = consumed.kcal > targets.kcal;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto h-full max-w-2xl space-y-6 overflow-y-auto px-5 py-6">
       <p className="text-sm capitalize text-zinc-500">{formatDayLabel(today)}</p>
 
       {/* Resumen del día */}
@@ -151,16 +151,15 @@ function MacroBar({
   const pct = target > 0 ? Math.min(100, Math.round((value / target) * 100)) : 0;
   return (
     <div>
-      <div className="flex items-baseline justify-between text-xs">
-        <span className="flex items-center gap-1 opacity-90">
-          <Icon className="h-3.5 w-3.5" />
-          {label}
-        </span>
-        <span className="opacity-90">
-          {Math.round(value)}/{target}g
-        </span>
+      <div className="flex items-center gap-1 text-[11px] opacity-90">
+        <Icon className="h-3.5 w-3.5 shrink-0" />
+        <span className="truncate">{label}</span>
       </div>
-      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-white/25">
+      <p className="mt-0.5 text-sm font-semibold leading-none">
+        {Math.round(value)}
+        <span className="text-[11px] font-normal opacity-70">/{target}g</span>
+      </p>
+      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/25">
         <div
           className="h-full rounded-full bg-white"
           style={{ width: `${pct}%` }}

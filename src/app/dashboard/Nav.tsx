@@ -40,7 +40,7 @@ export function TopNav() {
 export function BottomNav() {
   const isActive = useActive();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 flex border-t border-zinc-200 bg-white/95 backdrop-blur md:hidden dark:border-zinc-800 dark:bg-zinc-950/95">
+    <nav className="flex shrink-0 border-t border-zinc-200 bg-white md:hidden dark:border-zinc-800 dark:bg-zinc-950">
       {TABS.map((t) => {
         const active = isActive(t.href);
         const Icon = t.icon;
