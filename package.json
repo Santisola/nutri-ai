@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test:vision": "tsx scripts/test-vision.ts",
     "test:suggest": "tsx scripts/test-suggest.ts",
+    "test:textmeal": "tsx scripts/test-text-meal.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",

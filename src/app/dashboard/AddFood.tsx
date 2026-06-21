@@ -1,13 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Camera, Pencil } from "lucide-react";
+import { Camera, Pencil, Mic, CalendarDays, type LucideIcon } from "lucide-react";
 import PhotoMeal from "./PhotoMeal";
 import AddMealForm from "./AddMealForm";
+import TextMeal from "./TextMeal";
+import DayLoad from "./DayLoad";
 import { PHOTOS_EVENT } from "@/lib/image";
 
+type Tab = "photo" | "voice" | "day" | "manual";
+
+const TABS: { value: Tab; label: string; icon: LucideIcon }[] = [
+  { value: "photo", label: "Foto", icon: Camera },
+  { value: "voice", label: "Voz", icon: Mic },
+  { value: "day", label: "Día", icon: CalendarDays },
+  { value: "manual", label: "Manual", icon: Pencil },
+];
+
 export default function AddFood() {
-  const [tab, setTab] = useState<"photo" | "manual">("photo");
+  const [tab, setTab] = useState<Tab>("photo");
 
   // Si llegan fotos desde el FAB, asegurarse de mostrar la pestaña de foto.
   useEffect(() => {
@@ -18,21 +29,31 @@ export default function AddFood() {
 
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="font-semibold text-zinc-900 dark:text-zinc-50">
-          Agregar comida
-        </h2>
-        <div className="flex rounded-full bg-zinc-100 p-1 dark:bg-zinc-800">
-          <TabButton active={tab === "photo"} onClick={() => setTab("photo")}>
-            <Camera className="h-4 w-4" /> Foto
+      <h2 className="mb-3 font-semibold text-zinc-900 dark:text-zinc-50">
+        Agregar comida
+      </h2>
+
+      <div
+        role="tablist"
+        aria-label="Forma de agregar comida"
+        className="mb-4 grid grid-cols-4 gap-1 rounded-2xl bg-zinc-100 p-1 dark:bg-zinc-800"
+      >
+        {TABS.map((t) => (
+          <TabButton
+            key={t.value}
+            active={tab === t.value}
+            onClick={() => setTab(t.value)}
+            icon={t.icon}
+          >
+            {t.label}
           </TabButton>
-          <TabButton active={tab === "manual"} onClick={() => setTab("manual")}>
-            <Pencil className="h-4 w-4" /> Manual
-          </TabButton>
-        </div>
+        ))}
       </div>
 
-      {tab === "photo" ? <PhotoMeal /> : <AddMealForm />}
+      {tab === "photo" && <PhotoMeal />}
+      {tab === "voice" && <TextMeal />}
+      {tab === "day" && <DayLoad />}
+      {tab === "manual" && <AddMealForm />}
     </section>
   );
 }
@@ -40,21 +61,26 @@ export default function AddFood() {
 function TabButton({
   active,
   onClick,
+  icon: Icon,
   children,
 }: {
   active: boolean;
   onClick: () => void;
+  icon: LucideIcon;
   children: React.ReactNode;
 }) {
   return (
     <button
+      role="tab"
+      aria-selected={active}
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition ${
+      className={`flex flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-xs font-medium transition sm:flex-row sm:gap-1.5 sm:rounded-full sm:py-1.5 sm:text-sm ${
         active
           ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-50"
           : "text-zinc-500 dark:text-zinc-400"
       }`}
     >
+      <Icon className="h-4 w-4 shrink-0" />
       {children}
     </button>
   );

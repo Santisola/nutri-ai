@@ -21,14 +21,50 @@ export const foodDetectionSchema = z.object({
 });
 export type FoodDetection = z.infer<typeof foodDetectionSchema>;
 
+// Lista de alimentos detectados, descartando ítems sin nombre válido en lugar de
+// romper todo el resultado. Compartida por visión (foto) y estimación por texto.
+const detectedFoods = z
+  .array(foodDetectionSchema.nullable().catch(null))
+  .transform((arr) => arr.filter((f): f is FoodDetection => f !== null));
+
 export const visionResultSchema = z.object({
-  // Descartamos ítems sin nombre válido en lugar de romper todo el resultado.
-  foods: z.array(foodDetectionSchema.nullable().catch(null)).transform((arr) =>
-    arr.filter((f): f is FoodDetection => f !== null)
-  ),
+  foods: detectedFoods,
   notes: z.string().optional(),
 });
 export type VisionResult = z.infer<typeof visionResultSchema>;
+
+/* ───── Comida descrita en texto/voz (misma forma que la visión) ───── */
+
+export const mealFromTextSchema = z.object({
+  foods: detectedFoods,
+  notes: z.string().optional(),
+});
+export type MealFromText = z.infer<typeof mealFromTextSchema>;
+
+/* ───── Día completo descrito en texto/voz (varias comidas) ───── */
+
+export const MEAL_TYPE_VALUES = [
+  "breakfast",
+  "lunch",
+  "dinner",
+  "snack",
+] as const;
+
+export const dayMealSchema = z.object({
+  mealType: z.enum(MEAL_TYPE_VALUES).catch("snack"),
+  foods: detectedFoods,
+});
+export type DayMeal = z.infer<typeof dayMealSchema>;
+
+export const dayFromTextSchema = z.object({
+  // Descartamos comidas nulas o sin alimentos.
+  meals: z
+    .array(dayMealSchema.nullable().catch(null))
+    .transform((arr) =>
+      arr.filter((m): m is DayMeal => m !== null && m.foods.length > 0)
+    ),
+});
+export type DayFromText = z.infer<typeof dayFromTextSchema>;
 
 /* ───── Entrada para sugerencia de comida ───── */
 
@@ -148,6 +184,10 @@ export interface TextProvider {
   estimateMacrosPer100g(names: string[]): Promise<MacroEstimate>;
   /** Estima peso total (g) y macros/100g de un alimento descrito en texto libre. */
   estimateFoodFromText(description: string): Promise<FoodTextEstimate>;
+  /** Identifica los alimentos de UNA comida descrita en texto/voz, con porciones. */
+  estimateMealFromText(description: string): Promise<MealFromText>;
+  /** Separa la descripción de un día entero en comidas, cada una con sus alimentos. */
+  estimateDayFromText(description: string): Promise<DayFromText>;
   /** Chat restringido a consultas de nutrición/alimentación. */
   nutritionChat(
     history: ChatMessage[],

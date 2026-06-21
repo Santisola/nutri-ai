@@ -7,6 +7,8 @@ import {
   type MealSuggestionContext,
   type MacroEstimate,
   type FoodTextEstimate,
+  type MealFromText,
+  type DayFromText,
   type ChatMessage,
   type ChatContext,
   type ChatReply,
@@ -16,6 +18,8 @@ import {
   mealSuggestionSchema,
   macroEstimateSchema,
   foodTextEstimateSchema,
+  mealFromTextSchema,
+  dayFromTextSchema,
   chatReplySchema,
   importedTargetsSchema,
 } from "./types";
@@ -210,6 +214,48 @@ Devolvé SOLO un JSON con esta forma exacta (sin texto extra):
 
     const text = firstContent(res);
     return foodTextEstimateSchema.parse(extractJson(text));
+  }
+
+  async estimateMealFromText(description: string): Promise<MealFromText> {
+    const model = process.env.AI_TEXT_MODEL;
+    if (!model) throw new Error("AI_TEXT_MODEL no está definida");
+
+    const prompt = `El usuario describe en lenguaje natural UNA comida, que puede tener varios alimentos (ej: "comí dos milanesas de pollo con puré y una ensalada de tomate").
+Descripción: "${description}".
+Identificá CADA alimento por separado. Para cada uno estimá los gramos de la porción y sus calorías y macros (proteína, carbohidratos, grasa) PARA ESA PORCIÓN.
+Si no aclara cantidad, asumí una porción típica. Usá nombres simples en español.
+Devolvé SOLO un JSON con esta forma exacta (sin texto extra):
+{"foods":[{"name":"<alimento en español>","estimatedGrams":<número>,"confidence":"high|medium|low","kcal":<número>,"protein":<gramos>,"carb":<gramos>,"fat":<gramos>}]}`;
+
+    const res = await client().chat.completions.create({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
+    });
+
+    return mealFromTextSchema.parse(extractJson(firstContent(res)));
+  }
+
+  async estimateDayFromText(description: string): Promise<DayFromText> {
+    const model = process.env.AI_TEXT_MODEL;
+    if (!model) throw new Error("AI_TEXT_MODEL no está definida");
+
+    const prompt = `El usuario describe TODO lo que comió a lo largo de un día. Separalo en comidas y, dentro de cada comida, identificá cada alimento con su porción.
+Descripción: "${description}".
+Tipos de comida válidos (usá EXACTAMENTE estos valores en inglés): "breakfast" (desayuno), "lunch" (almuerzo), "snack" (merienda o colación), "dinner" (cena).
+Agrupá cada alimento en el momento del día que corresponda según lo que cuenta el usuario. Si no queda claro a qué momento pertenece algo, usá "snack". No repitas alimentos.
+Para cada alimento estimá los gramos de la porción y sus calorías y macros (proteína, carbohidratos, grasa) PARA ESA PORCIÓN. Usá nombres simples en español.
+Devolvé SOLO un JSON con esta forma exacta (sin texto extra):
+{"meals":[{"mealType":"breakfast|lunch|snack|dinner","foods":[{"name":"<alimento>","estimatedGrams":<número>,"confidence":"high|medium|low","kcal":<número>,"protein":<gramos>,"carb":<gramos>,"fat":<gramos>}]}]}`;
+
+    const res = await client().chat.completions.create({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
+      max_tokens: 1500,
+    });
+
+    return dayFromTextSchema.parse(extractJson(firstContent(res)));
   }
 
   async nutritionChat(

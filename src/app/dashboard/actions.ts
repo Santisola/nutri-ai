@@ -16,7 +16,11 @@ import {
   searchFoods as searchFoodsQuery,
   getFoodsByIds,
 } from "@/lib/nutrition/foods.queries";
-import { analyzeFoodPhoto } from "@/lib/nutrition/analyze";
+import {
+  analyzeFoodPhoto,
+  analyzeMealText,
+  analyzeDayText,
+} from "@/lib/nutrition/analyze";
 import { getTextProvider } from "@/lib/ai";
 import {
   getProfile,
@@ -217,19 +221,17 @@ const saveAnalyzedSchema = z.object({
   source: z.enum(["ai", "manual"]).optional(),
 });
 
-/** Guarda una comida revisada por el usuario (de foto-IA o carga manual). */
-export async function saveAnalyzedMeal(input: {
-  mealType: string;
-  items: AnalyzedItem[];
-  source?: "ai" | "manual";
-}) {
-  const userId = await getCurrentUserId();
-  if (!userId) return { error: "No autenticado" };
-
-  const parsed = saveAnalyzedSchema.safeParse(input);
-  if (!parsed.success) return { error: "Datos inválidos" };
-  const { mealType, items, source = "ai" } = parsed.data;
-
+/**
+ * Inserta una comida (meal_log + sus items) para el usuario. No revalida — el
+ * caller decide cuándo (útil para guardar varias comidas de una sola vez).
+ */
+async function insertMeal(
+  userId: string,
+  date: string,
+  mealType: MealType,
+  items: AnalyzedItem[],
+  source: "ai" | "manual"
+) {
   const computed = items.map((it) => ({ ...it, m: macrosFor(it) }));
   const total = computed.reduce(
     (acc, r) => ({
@@ -245,7 +247,7 @@ export async function saveAnalyzedMeal(input: {
     .insert(mealLogs)
     .values({
       userId,
-      date: todayISO(),
+      date,
       mealType,
       kcal: total.kcal,
       protein: total.protein,
@@ -268,6 +270,117 @@ export async function saveAnalyzedMeal(input: {
       confidence: r.source === "db" ? ("high" as const) : ("low" as const),
     }))
   );
+}
+
+/** Guarda una comida revisada por el usuario (de foto-IA, texto/voz o manual). */
+export async function saveAnalyzedMeal(input: {
+  mealType: string;
+  items: AnalyzedItem[];
+  source?: "ai" | "manual";
+}) {
+  const userId = await getCurrentUserId();
+  if (!userId) return { error: "No autenticado" };
+
+  const parsed = saveAnalyzedSchema.safeParse(input);
+  if (!parsed.success) return { error: "Datos inválidos" };
+  const { mealType, items, source = "ai" } = parsed.data;
+
+  await insertMeal(userId, todayISO(), mealType, items, source);
+
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
+const MAX_MEAL_DESC = 600;
+const MAX_DAY_DESC = 2000;
+
+/** Analiza la descripción (texto/voz) de UNA comida y devuelve sus alimentos. */
+export async function analyzeMealDescription(input: {
+  description: string;
+}): Promise<{ items?: AnalyzedItem[]; error?: string }> {
+  const userId = await getCurrentUserId();
+  if (!userId) return { error: "No autenticado" };
+
+  const description = (input.description ?? "").trim().slice(0, MAX_MEAL_DESC);
+  if (description.length < 3) {
+    return { error: "Describí la comida con un poco más de detalle." };
+  }
+
+  const rl = rateLimit(`mealtext:${userId}`, 12, 60_000);
+  if (!rl.ok) {
+    return {
+      error: `Esperá ${Math.ceil(rl.retryAfterMs / 1000)}s antes de procesar otra.`,
+    };
+  }
+
+  try {
+    const items = await analyzeMealText(description);
+    if (items.length === 0) {
+      return { error: "No se detectaron alimentos. Probá con más detalle." };
+    }
+    return { items };
+  } catch (e) {
+    return { error: aiErrorMessage(e) };
+  }
+}
+
+/** Analiza la descripción (texto/voz) de un día entero, separada en comidas. */
+export async function analyzeDayDescription(input: {
+  description: string;
+}): Promise<{
+  meals?: { mealType: MealType; items: AnalyzedItem[] }[];
+  error?: string;
+}> {
+  const userId = await getCurrentUserId();
+  if (!userId) return { error: "No autenticado" };
+
+  const description = (input.description ?? "").trim().slice(0, MAX_DAY_DESC);
+  if (description.length < 10) {
+    return { error: "Contá lo que comiste en el día con un poco más de detalle." };
+  }
+
+  const rl = rateLimit(`daytext:${userId}`, 6, 60_000);
+  if (!rl.ok) {
+    return {
+      error: `Esperá ${Math.ceil(rl.retryAfterMs / 1000)}s antes de procesar otro día.`,
+    };
+  }
+
+  try {
+    const meals = await analyzeDayText(description);
+    if (meals.length === 0) {
+      return { error: "No se detectaron comidas. Probá con más detalle." };
+    }
+    return { meals };
+  } catch (e) {
+    return { error: aiErrorMessage(e) };
+  }
+}
+
+const saveDaySchema = z
+  .array(
+    z.object({
+      mealType: z.enum(["breakfast", "lunch", "dinner", "snack"]),
+      items: z.array(analyzedItemSchema).min(1),
+    })
+  )
+  .min(1)
+  .max(8);
+
+/** Guarda varias comidas del día (de la carga "día completo") de una sola vez. */
+export async function saveDayMeals(input: {
+  meals: { mealType: string; items: AnalyzedItem[] }[];
+}) {
+  const userId = await getCurrentUserId();
+  if (!userId) return { error: "No autenticado" };
+
+  const parsed = saveDaySchema.safeParse(input.meals);
+  if (!parsed.success) return { error: "Datos inválidos" };
+
+  const date = todayISO();
+  for (const meal of parsed.data) {
+    await insertMeal(userId, date, meal.mealType, meal.items, "ai");
+  }
 
   revalidatePath("/dashboard");
   return { ok: true };
