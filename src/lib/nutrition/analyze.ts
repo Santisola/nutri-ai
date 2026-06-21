@@ -49,12 +49,22 @@ export async function analyzeFoodPhoto(
   return resolveAndFill(result.foods);
 }
 
+export interface MealTextResult {
+  isFood: boolean;
+  message: string;
+  items: AnalyzedItem[];
+}
+
 /** Pipeline texto/voz → alimentos de UNA comida con macros (modo híbrido). */
 export async function analyzeMealText(
   description: string
-): Promise<AnalyzedItem[]> {
+): Promise<MealTextResult> {
   const result = await getTextProvider().estimateMealFromText(description);
-  return resolveAndFill(result.foods);
+  if (!result.isFood) {
+    return { isFood: false, message: result.message, items: [] };
+  }
+  const items = await resolveAndFill(result.foods);
+  return { isFood: true, message: "", items };
 }
 
 export interface DayMealResult {
@@ -62,11 +72,20 @@ export interface DayMealResult {
   items: AnalyzedItem[];
 }
 
+export interface DayTextResult {
+  isFood: boolean;
+  message: string;
+  meals: DayMealResult[];
+}
+
 /** Pipeline texto/voz → día completo separado en comidas, cada una con macros. */
 export async function analyzeDayText(
   description: string
-): Promise<DayMealResult[]> {
+): Promise<DayTextResult> {
   const result = await getTextProvider().estimateDayFromText(description);
+  if (!result.isFood) {
+    return { isFood: false, message: result.message, meals: [] };
+  }
   const meals = await Promise.all(
     result.meals.map(async (m) => ({
       mealType: m.mealType,
@@ -74,5 +93,5 @@ export async function analyzeDayText(
     }))
   );
   // Descartamos comidas que no resolvieron ningún alimento.
-  return meals.filter((m) => m.items.length > 0);
+  return { isFood: true, message: "", meals: meals.filter((m) => m.items.length > 0) };
 }

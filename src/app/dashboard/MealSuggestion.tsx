@@ -5,6 +5,7 @@ import { Utensils } from "lucide-react";
 import { suggestNextMeal } from "./actions";
 import type { MealSuggestion as Suggestion } from "@/lib/ai/types";
 import type { MealType } from "@/lib/date";
+import FormError from "@/components/FormError";
 
 const MEAL_TYPES: { value: MealType; label: string }[] = [
   { value: "breakfast", label: "Desayuno" },
@@ -91,7 +92,7 @@ export default function MealSuggestion() {
         </p>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <FormError>{error}</FormError>}
 
       {result && result.suggestions.length > 0 && (
         <ul className="flex flex-col gap-3">

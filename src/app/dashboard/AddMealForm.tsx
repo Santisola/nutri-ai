@@ -4,6 +4,7 @@ import { useState, useTransition, useRef } from "react";
 import { X, Sparkles } from "lucide-react";
 import { searchFoods, estimateManualFood, saveAnalyzedMeal } from "./actions";
 import { macrosFor, type Food, type AnalyzedItem } from "@/lib/nutrition/foods";
+import FormError from "@/components/FormError";
 
 const MEAL_TYPES = [
   { value: "breakfast", label: "Desayuno" },
@@ -239,7 +240,7 @@ export default function AddMealForm() {
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <FormError>{error}</FormError>}
 
       <button
         onClick={save}

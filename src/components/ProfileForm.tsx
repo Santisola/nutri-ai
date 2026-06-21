@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { Check } from "lucide-react";
+import FormError from "@/components/FormError";
 
 export type ProfileFormState = { error?: string; ok?: boolean } | null;
 
@@ -204,9 +205,7 @@ export default function ProfileForm({
         </div>
       </div>
 
-      {state?.error && (
-        <p className="text-sm text-red-600 dark:text-red-400">{state.error}</p>
-      )}
+      {state?.error && <FormError>{state.error}</FormError>}
       {state?.ok && successMessage && (
         <p className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400">
           <Check className="h-4 w-4" />

@@ -9,11 +9,17 @@ async function main() {
   const meal = await getTextProvider().estimateMealFromText(
     "dos milanesas de pollo con puré y una ensalada de tomate y cebolla"
   );
+  console.log(`  isFood=${meal.isFood}`);
   for (const f of meal.foods) {
     console.log(
       `  • ${f.name} · ${f.estimatedGrams}g · ${f.kcal} kcal (${f.confidence})`
     );
   }
+
+  console.log('\n── No comida ("bla bla bla") ──');
+  const junk = await getTextProvider().estimateMealFromText("bla bla bla");
+  console.log(`  isFood=${junk.isFood} · foods=${junk.foods.length}`);
+  console.log(`  message: ${junk.message}`);
 
   console.log("\n── Día completo (estimateDayFromText) ──");
   const day = await getTextProvider().estimateDayFromText(

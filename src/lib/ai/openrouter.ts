@@ -222,10 +222,17 @@ Devolvé SOLO un JSON con esta forma exacta (sin texto extra):
 
     const prompt = `El usuario describe en lenguaje natural UNA comida, que puede tener varios alimentos (ej: "comí dos milanesas de pollo con puré y una ensalada de tomate").
 Descripción: "${description}".
-Identificá CADA alimento por separado. Para cada uno estimá los gramos de la porción y sus calorías y macros (proteína, carbohidratos, grasa) PARA ESA PORCIÓN.
-Si no aclara cantidad, asumí una porción típica. Usá nombres simples en español.
+
+PRIMERO decidí si el texto realmente describe comida, bebida o alimentos que una persona comió o tomó.
+- Si NO es comida (texto sin sentido como "bla bla bla", otro tema, código, un insulto, una pregunta, etc.): devolvé isFood=false, foods=[] y en "message" un comentario BREVE (1-2 frases) con humor e ironía amable en español rioplatense, con metáforas gastronómicas, basado en LO QUE ESCRIBIÓ, que lo invite a describir su comida. NO inventes ningún alimento.
+- Si SÍ es comida: devolvé isFood=true, message="" e identificá CADA alimento por separado. Para cada uno estimá los gramos de la porción y sus calorías y macros (proteína, carbohidratos, grasa) PARA ESA PORCIÓN. Si no aclara cantidad, asumí una porción típica. Usá nombres simples en español.
+
+Ejemplos de tono para "message" (no los copies literal, adaptá a lo que escribió):
+· "Eso no se come ni con mucha hambre. Contame qué pusiste en el plato y lo anoto."
+· "De ahí no sale ni un caldito. ¿Qué comiste en serio?"
+
 Devolvé SOLO un JSON con esta forma exacta (sin texto extra):
-{"foods":[{"name":"<alimento en español>","estimatedGrams":<número>,"confidence":"high|medium|low","kcal":<número>,"protein":<gramos>,"carb":<gramos>,"fat":<gramos>}]}`;
+{"isFood":true|false,"message":"<solo si isFood=false>","foods":[{"name":"<alimento en español>","estimatedGrams":<número>,"confidence":"high|medium|low","kcal":<número>,"protein":<gramos>,"carb":<gramos>,"fat":<gramos>}]}`;
 
     const res = await client().chat.completions.create({
       model,
@@ -242,11 +249,17 @@ Devolvé SOLO un JSON con esta forma exacta (sin texto extra):
 
     const prompt = `El usuario describe TODO lo que comió a lo largo de un día. Separalo en comidas y, dentro de cada comida, identificá cada alimento con su porción.
 Descripción: "${description}".
+
+PRIMERO decidí si el texto realmente describe comida, bebida o alimentos que la persona comió o tomó.
+- Si NO es comida (texto sin sentido como "bla bla bla", otro tema, código, un insulto, una pregunta, etc.): devolvé isFood=false, meals=[] y en "message" un comentario BREVE (1-2 frases) con humor e ironía amable en español rioplatense, con metáforas gastronómicas, basado en LO QUE ESCRIBIÓ, que lo invite a contar qué comió en el día. NO inventes ningún alimento ni comida.
+- Si SÍ es comida: devolvé isFood=true, message="" y separá el día en comidas como se indica abajo.
+
 Tipos de comida válidos (usá EXACTAMENTE estos valores en inglés): "breakfast" (desayuno), "lunch" (almuerzo), "snack" (merienda o colación), "dinner" (cena).
 Agrupá cada alimento en el momento del día que corresponda según lo que cuenta el usuario. Si no queda claro a qué momento pertenece algo, usá "snack". No repitas alimentos.
 Para cada alimento estimá los gramos de la porción y sus calorías y macros (proteína, carbohidratos, grasa) PARA ESA PORCIÓN. Usá nombres simples en español.
+
 Devolvé SOLO un JSON con esta forma exacta (sin texto extra):
-{"meals":[{"mealType":"breakfast|lunch|snack|dinner","foods":[{"name":"<alimento>","estimatedGrams":<número>,"confidence":"high|medium|low","kcal":<número>,"protein":<gramos>,"carb":<gramos>,"fat":<gramos>}]}]}`;
+{"isFood":true|false,"message":"<solo si isFood=false>","meals":[{"mealType":"breakfast|lunch|snack|dinner","foods":[{"name":"<alimento>","estimatedGrams":<número>,"confidence":"high|medium|low","kcal":<número>,"protein":<gramos>,"carb":<gramos>,"fat":<gramos>}]}]}`;
 
     const res = await client().chat.completions.create({
       model,

@@ -6,6 +6,7 @@ import { sumAnalyzed, type AnalyzedItem } from "@/lib/nutrition/foods";
 import { type MealType } from "@/lib/date";
 import VoiceTextarea from "./VoiceTextarea";
 import MealItemsEditor from "./MealItemsEditor";
+import FormError from "@/components/FormError";
 
 const MAX_DESC = 2000;
 
@@ -178,7 +179,7 @@ export default function DayLoad() {
         </p>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <FormError>{error}</FormError>}
 
       {meals && (
         <div className="flex flex-col gap-5">

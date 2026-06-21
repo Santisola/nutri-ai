@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { Check } from "lucide-react";
 import { logWeight } from "./actions";
+import FormError from "@/components/FormError";
 
 export default function WeightForm({ current }: { current?: number }) {
   const [state, formAction, pending] = useActionState(logWeight, null);
@@ -33,7 +34,7 @@ export default function WeightForm({ current }: { current?: number }) {
         </button>
       </form>
 
-      {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
+      {state?.error && <FormError>{state.error}</FormError>}
       {state?.ok && (
         <p className="flex items-center gap-1.5 text-sm text-emerald-600">
           <Check className="h-4 w-4" /> Peso registrado para hoy.

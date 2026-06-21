@@ -314,11 +314,18 @@ export async function analyzeMealDescription(input: {
   }
 
   try {
-    const items = await analyzeMealText(description);
-    if (items.length === 0) {
+    const res = await analyzeMealText(description);
+    if (!res.isFood) {
+      return {
+        error:
+          res.message.slice(0, 300) ||
+          "Eso no parece comida. Contame qué comiste y lo anoto.",
+      };
+    }
+    if (res.items.length === 0) {
       return { error: "No se detectaron alimentos. Probá con más detalle." };
     }
-    return { items };
+    return { items: res.items };
   } catch (e) {
     return { error: aiErrorMessage(e) };
   }
@@ -347,11 +354,18 @@ export async function analyzeDayDescription(input: {
   }
 
   try {
-    const meals = await analyzeDayText(description);
-    if (meals.length === 0) {
+    const res = await analyzeDayText(description);
+    if (!res.isFood) {
+      return {
+        error:
+          res.message.slice(0, 300) ||
+          "Eso no parece comida. Contame qué comiste en el día y lo anoto.",
+      };
+    }
+    if (res.meals.length === 0) {
       return { error: "No se detectaron comidas. Probá con más detalle." };
     }
-    return { meals };
+    return { meals: res.meals };
   } catch (e) {
     return { error: aiErrorMessage(e) };
   }

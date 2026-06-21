@@ -36,6 +36,11 @@ export type VisionResult = z.infer<typeof visionResultSchema>;
 /* ───── Comida descrita en texto/voz (misma forma que la visión) ───── */
 
 export const mealFromTextSchema = z.object({
+  // El modelo decide si el texto realmente describe comida. Default true para no
+  // bloquear inputs legítimos si el modelo omite el campo.
+  isFood: z.coerce.boolean().catch(true),
+  // Mensaje irónico que el modelo arma cuando isFood=false (basado en el input).
+  message: z.string().catch(""),
   foods: detectedFoods,
   notes: z.string().optional(),
 });
@@ -57,6 +62,8 @@ export const dayMealSchema = z.object({
 export type DayMeal = z.infer<typeof dayMealSchema>;
 
 export const dayFromTextSchema = z.object({
+  isFood: z.coerce.boolean().catch(true),
+  message: z.string().catch(""),
   // Descartamos comidas nulas o sin alimentos.
   meals: z
     .array(dayMealSchema.nullable().catch(null))

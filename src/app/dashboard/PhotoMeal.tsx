@@ -5,6 +5,7 @@ import { Camera, ImagePlus, X } from "lucide-react";
 import { analyzeMealPhoto, saveAnalyzedMeal } from "./actions";
 import { macrosFor, type AnalyzedItem } from "@/lib/nutrition/foods";
 import { fileToScaledDataUrl, takePendingPhotos, PHOTOS_EVENT } from "@/lib/image";
+import FormError from "@/components/FormError";
 
 const MAX_IMAGES = 5;
 
@@ -267,7 +268,7 @@ export default function PhotoMeal() {
         </p>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <FormError>{error}</FormError>}
 
       {items && (
         <div className="flex flex-col gap-4">

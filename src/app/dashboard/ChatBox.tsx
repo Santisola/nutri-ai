@@ -6,6 +6,7 @@ import { Send, Leaf, ClipboardCheck } from "lucide-react";
 import { sendChatMessage } from "./actions";
 import type { ChatMessage } from "@/lib/ai/types";
 import Markdown from "@/components/Markdown";
+import FormError from "@/components/FormError";
 
 const MAX_LEN = 600;
 
@@ -164,7 +165,7 @@ export default function ChatBox() {
         <div ref={bottomRef} />
       </div>
 
-      {error && <p className="px-1 pt-2 text-sm text-red-600">{error}</p>}
+      {error && <FormError className="mt-2">{error}</FormError>}
 
       {/* Composer */}
       <form

@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { FileUp, Sparkles, X } from "lucide-react";
 import { extractPdfText, PDF_MIN_TEXT } from "@/lib/pdf";
 import { processImportedPlan, saveImportedPlan } from "./actions";
+import FormError from "@/components/FormError";
 
 type Phase = "idle" | "reading" | "processing" | "review";
 type TargetFields = { kcal: string; protein: string; carb: string; fat: string };
@@ -131,7 +132,7 @@ export default function ImportPdf({
             El modelo gratuito puede tardar ~30-40 segundos.
           </p>
         )}
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <FormError>{error}</FormError>}
       </div>
     );
   }
@@ -198,7 +199,7 @@ export default function ImportPdf({
         </div>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <FormError>{error}</FormError>}
 
       <button
         onClick={save}

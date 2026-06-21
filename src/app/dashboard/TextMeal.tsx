@@ -6,6 +6,7 @@ import { type AnalyzedItem } from "@/lib/nutrition/foods";
 import { currentMealType, type MealType } from "@/lib/date";
 import VoiceTextarea from "./VoiceTextarea";
 import MealItemsEditor from "./MealItemsEditor";
+import FormError from "@/components/FormError";
 
 const MAX_DESC = 600;
 
@@ -147,7 +148,7 @@ export default function TextMeal() {
         </p>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <FormError>{error}</FormError>}
 
       {items && (
         <div className="flex flex-col gap-4">

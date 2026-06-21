@@ -6,6 +6,7 @@ import { RefreshCw, MessageCircle, Sparkles, FileCheck } from "lucide-react";
 import { generateMyPlan } from "./actions";
 import ImportPdf from "./ImportPdf";
 import Markdown from "@/components/Markdown";
+import FormError from "@/components/FormError";
 
 const LOADING = [
   "Analizando tu objetivo…",
@@ -94,7 +95,7 @@ export default function PlanView({
         <p className="max-w-xs text-sm text-zinc-500">
           Generá tu guía de alimentación personalizada para alcanzar tu objetivo.
         </p>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <FormError>{error}</FormError>}
         <button
           onClick={generate}
           className="h-11 rounded-full bg-emerald-600 px-6 font-medium text-white transition hover:bg-emerald-700"
@@ -123,7 +124,7 @@ export default function PlanView({
         <Markdown>{content}</Markdown>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <FormError>{error}</FormError>}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Link

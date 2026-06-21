@@ -31,33 +31,83 @@ export function useSpeechToText(lang = "es-AR") {
   const [listening, setListening] = useState(false);
   const recRef = useRef<SpeechRecognition | null>(null);
   const onTextRef = useRef<(chunk: string) => void>(() => {});
+  // Intención del usuario: true mientras quiere seguir dictando. El navegador
+  // corta solo tras un silencio (dispara `onend` aunque `continuous` sea true);
+  // mientras esto siga en true, reabrimos el reconocimiento automáticamente.
+  const wantRef = useRef(false);
 
   // Cancelamos cualquier sesión activa al desmontar.
-  useEffect(() => () => recRef.current?.abort(), []);
+  useEffect(
+    () => () => {
+      wantRef.current = false;
+      recRef.current?.abort();
+    },
+    []
+  );
 
   const start = useCallback(
     (onText: (chunk: string) => void) => {
       const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!Ctor) return;
       // Si ya había una sesión activa, la cerramos antes de abrir otra.
+      wantRef.current = false;
       recRef.current?.abort();
 
       onTextRef.current = onText;
-      const rec = new Ctor();
-      rec.lang = lang;
-      rec.continuous = true;
-      rec.interimResults = false;
-      rec.onresult = (e) => {
-        let chunk = "";
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          const res = e.results[i];
-          if (res.isFinal) chunk += res[0].transcript;
-        }
-        chunk = chunk.trim();
-        if (chunk) onTextRef.current(chunk);
+      wantRef.current = true;
+
+      const build = (): SpeechRecognition => {
+        const rec = new Ctor();
+        rec.lang = lang;
+        rec.continuous = true;
+        rec.interimResults = false;
+        rec.onresult = (e) => {
+          let chunk = "";
+          for (let i = e.resultIndex; i < e.results.length; i++) {
+            const res = e.results[i];
+            if (res.isFinal) chunk += res[0].transcript;
+          }
+          chunk = chunk.trim();
+          if (chunk) onTextRef.current(chunk);
+        };
+        rec.onerror = (e) => {
+          // "no-speech"/"aborted" son cortes normales: si el usuario sigue
+          // queriendo dictar, dejamos que `onend` reinicie. Otros errores
+          // (ej: "not-allowed" = permiso denegado) sí terminan el dictado.
+          if (e.error !== "no-speech" && e.error !== "aborted") {
+            wantRef.current = false;
+            setListening(false);
+          }
+        };
+        rec.onend = () => {
+          if (!wantRef.current) {
+            setListening(false);
+            return;
+          }
+          // El navegador cortó por silencio pero el usuario sigue: reabrimos.
+          try {
+            const next = build();
+            recRef.current = next;
+            next.start();
+          } catch {
+            // Si falla el reinicio inmediato, reintentamos en un instante.
+            setTimeout(() => {
+              if (!wantRef.current) return;
+              try {
+                const next = build();
+                recRef.current = next;
+                next.start();
+              } catch {
+                wantRef.current = false;
+                setListening(false);
+              }
+            }, 250);
+          }
+        };
+        return rec;
       };
-      rec.onerror = () => setListening(false);
-      rec.onend = () => setListening(false);
+
+      const rec = build();
       recRef.current = rec;
       rec.start();
       setListening(true);
@@ -66,6 +116,9 @@ export function useSpeechToText(lang = "es-AR") {
   );
 
   const stop = useCallback(() => {
+    // Marcamos que ya no queremos dictar ANTES de cortar, para que `onend` no
+    // reabra el reconocimiento.
+    wantRef.current = false;
     recRef.current?.stop();
     setListening(false);
   }, []);
