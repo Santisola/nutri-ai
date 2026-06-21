@@ -69,6 +69,13 @@ export async function estimateManualFood(label: string): Promise<{
 
   try {
     const e = await getTextProvider().estimateFoodFromText(name);
+    if (!e.isFood) {
+      return {
+        error:
+          e.message.slice(0, 300) ||
+          "Eso no parece un alimento. Escribí una comida y la estimo.",
+      };
+    }
     return {
       item: {
         grams: Math.round(e.grams),

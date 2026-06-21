@@ -200,11 +200,15 @@ Devolvé SOLO un JSON con esta forma exacta (un item por alimento, en el mismo o
 
     const prompt = `El usuario describe un alimento o plato y, opcionalmente, una cantidad o porción (ej: "2 porciones de ñoquis con tuco", "un plato de ensalada", "3 milanesas").
 Descripción: "${description}".
-Estimá DOS cosas:
-1. El PESO TOTAL en gramos de lo que describió. Si no aclara cantidad, asumí UNA porción típica.
-2. Los valores nutricionales POR 100 GRAMOS del alimento.
+
+PRIMERO decidí si el texto realmente describe comida, bebida o un alimento.
+- Si NO es comida (texto sin sentido como "bla bla bla", otro tema, código, un insulto, una pregunta, etc.): devolvé isFood=false, todos los números en 0 y en "message" un comentario BREVE (1-2 frases) con humor e ironía amable en español rioplatense, con metáforas gastronómicas, basado en LO QUE ESCRIBIÓ, que lo invite a escribir un alimento. NO inventes ningún alimento.
+- Si SÍ es comida: devolvé isFood=true, message="" y estimá DOS cosas:
+  1. El PESO TOTAL en gramos de lo que describió. Si no aclara cantidad, asumí UNA porción típica.
+  2. Los valores nutricionales POR 100 GRAMOS del alimento.
+
 Devolvé SOLO un JSON con esta forma exacta (sin texto extra):
-{"grams":<número>,"kcalPer100g":<número>,"proteinPer100g":<número>,"carbPer100g":<número>,"fatPer100g":<número>}`;
+{"isFood":true|false,"message":"<solo si isFood=false>","grams":<número>,"kcalPer100g":<número>,"proteinPer100g":<número>,"carbPer100g":<número>,"fatPer100g":<número>}`;
 
     const res = await client().chat.completions.create({
       model,

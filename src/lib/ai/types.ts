@@ -124,6 +124,10 @@ export type MacroEstimate = z.infer<typeof macroEstimateSchema>;
 // Estimación de un alimento descrito en texto libre (con cantidad opcional):
 // peso total estimado + valores por 100g.
 export const foodTextEstimateSchema = z.object({
+  // Igual que en las cargas por texto/voz: el modelo decide si es comida y, si no,
+  // devuelve un mensaje irónico. Default true para no bloquear inputs legítimos.
+  isFood: z.coerce.boolean().catch(true),
+  message: z.string().catch(""),
   grams: z.coerce.number().positive().catch(100),
   kcalPer100g: z.coerce.number().nonnegative().catch(0),
   proteinPer100g: z.coerce.number().nonnegative().catch(0),

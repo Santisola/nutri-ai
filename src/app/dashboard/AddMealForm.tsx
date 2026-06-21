@@ -26,6 +26,8 @@ export default function AddMealForm() {
 
   function onQueryChange(value: string) {
     setQuery(value);
+    // Al escribir de nuevo, limpiamos el error para reabrir el dropdown.
+    if (error) setError(null);
     if (debounce.current) clearTimeout(debounce.current);
     if (value.trim().length < 2) {
       setResults([]);
@@ -111,7 +113,8 @@ export default function AddMealForm() {
     });
   }
 
-  const showDropdown = query.trim().length >= 2;
+  // El dropdown se cierra cuando hay un error visible (ej: "no es comida").
+  const showDropdown = query.trim().length >= 2 && !error;
 
   return (
     <div className="flex flex-col gap-4">
@@ -242,13 +245,16 @@ export default function AddMealForm() {
 
       {error && <FormError>{error}</FormError>}
 
-      <button
-        onClick={save}
-        disabled={saving}
-        className="h-11 rounded-full bg-emerald-600 font-medium text-white transition hover:bg-emerald-700 disabled:opacity-60"
-      >
-        {saving ? "Guardando…" : "Guardar comida"}
-      </button>
+      {/* El botón de guardar no se muestra mientras hay un error visible. */}
+      {!error && (
+        <button
+          onClick={save}
+          disabled={saving}
+          className="h-11 rounded-full bg-emerald-600 font-medium text-white transition hover:bg-emerald-700 disabled:opacity-60"
+        >
+          {saving ? "Guardando…" : "Guardar comida"}
+        </button>
+      )}
     </div>
   );
 }
