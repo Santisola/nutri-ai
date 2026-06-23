@@ -69,6 +69,9 @@ export const profiles = pgTable("profile", {
   userId: text("userId")
     .primaryKey()
     .references(() => users.id, { onDelete: "cascade" }),
+  // Nombre real y apodo para tratar al usuario de forma cercana.
+  displayName: text("displayName"),
+  nickname: text("nickname"),
   // sex: "male" | "female"
   sex: text("sex").notNull(),
   birthYear: integer("birthYear").notNull(),

@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 export const profileSchema = z.object({
+  displayName: z.string().trim().max(60).optional(),
+  nickname: z.string().trim().max(40).optional(),
   sex: z.enum(["male", "female"]),
   birthYear: z.coerce.number().int().min(1920).max(new Date().getFullYear() - 10),
   heightCm: z.coerce.number().min(100).max(250),
@@ -33,6 +35,8 @@ export function toList(v?: string): string[] {
 /** Convierte el input validado a los valores de la tabla `profiles`. */
 export function toProfileValues(d: ProfileInput) {
   return {
+    displayName: d.displayName || null,
+    nickname: d.nickname || null,
     sex: d.sex,
     birthYear: d.birthYear,
     heightCm: d.heightCm,

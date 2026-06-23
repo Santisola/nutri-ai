@@ -50,6 +50,8 @@ export default async function PerfilPage() {
           submitLabel="Guardar cambios"
           successMessage="Cambios guardados"
           defaults={{
+            displayName: profile.displayName,
+            nickname: profile.nickname,
             sex: profile.sex,
             birthYear: profile.birthYear,
             heightCm: profile.heightCm,

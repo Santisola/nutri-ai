@@ -120,7 +120,7 @@ export default function OnboardingFlow({
         </p>
       </header>
 
-      <ProfileForm action={action} submitLabel="Calcular mi objetivo" />
+      <ProfileForm action={action} submitLabel="Calcular mi objetivo" stepped />
 
       <p className="text-xs text-zinc-400">
         Cálculo basado en la ecuación de Mifflin-St Jeor. No es consejo médico.

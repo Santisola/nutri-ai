@@ -42,9 +42,18 @@ export default async function DashboardPage() {
   const pct = Math.min(100, Math.round((consumed.kcal / targets.kcal) * 100));
   const over = consumed.kcal > targets.kcal;
 
+  const greetingName = profile.nickname || profile.displayName;
+
   return (
     <div className="mx-auto h-full max-w-2xl space-y-6 overflow-y-auto px-5 py-6">
-      <p className="text-sm capitalize text-zinc-500">{formatDayLabel(today)}</p>
+      <div>
+        <p className="text-sm capitalize text-zinc-500">{formatDayLabel(today)}</p>
+        {greetingName && (
+          <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+            Hola, {greetingName}
+          </h1>
+        )}
+      </div>
 
       {/* Resumen del día */}
       <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-600 to-emerald-500 p-6 text-white shadow-sm">
