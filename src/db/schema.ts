@@ -8,6 +8,7 @@ import {
   date,
   primaryKey,
   serial,
+  unique,
 } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
 
@@ -86,6 +87,8 @@ export const profiles = pgTable("profile", {
   dietaryPrefs: jsonb("dietaryPrefs").$type<string[]>().default([]),
   allergies: jsonb("allergies").$type<string[]>().default([]),
   dislikes: jsonb("dislikes").$type<string[]>().default([]),
+  // Cantidad de personas del grupo familiar (para escalar la lista de compras).
+  householdSize: integer("householdSize").notNull().default(1),
   updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
 });
 
@@ -146,6 +149,56 @@ export const weightLogs = pgTable("weight_log", {
   weightKg: real("weightKg").notNull(),
 });
 
+/* ─────────────────────────  Lista de compras  ───────────────────────── */
+
+// Categorías para agrupar los ítems en la UI (negocios de barrio / súper).
+export type ShoppingCategory =
+  | "verduleria"
+  | "carniceria"
+  | "pescaderia"
+  | "almacen" // secos / enlatados / despensa
+  | "lacteos" // lácteos y huevos
+  | "panificados"
+  | "congelados"
+  | "bebidas"
+  | "otros";
+
+export interface ShoppingItem {
+  name: string;
+  quantity: string; // texto libre: "1.4 kg", "12 unidades", "2 paquetes"
+  category: ShoppingCategory;
+  checked: boolean; // estado de tachado, persistido
+}
+
+// Idea de comida como proto-receta reutilizable (forward-compat con el futuro
+// calendario de comidas): id estable, tipo de comida, receta e ingredientes
+// estructurados con la misma forma que los ítems de la lista.
+export interface MealIdea {
+  id: string;
+  mealType: "breakfast" | "lunch" | "dinner" | "snack";
+  title: string;
+  recipe: string; // pasos/preparación, markdown corto
+  ingredients: Array<{
+    name: string;
+    quantity: string;
+    category: ShoppingCategory;
+  }>;
+  source: "ai"; // a futuro: "ai" | "manual"
+}
+
+// Lista de compras vigente. Una fila por usuario (se regenera, sin historial).
+export const shoppingLists = pgTable("shopping_list", {
+  userId: text("userId")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  // "weekly" | "biweekly"
+  period: text("period").notNull().default("weekly"),
+  householdSize: integer("householdSize").notNull().default(1),
+  items: jsonb("items").$type<ShoppingItem[]>().notNull().default([]),
+  mealIdeas: jsonb("mealIdeas").$type<MealIdea[]>().notNull().default([]),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+});
+
 // Plan/guía nutricional personalizado. Uno por usuario.
 export const nutritionPlans = pgTable("nutrition_plan", {
   userId: text("userId")
@@ -161,3 +214,58 @@ export const nutritionPlans = pgTable("nutrition_plan", {
   fat: real("fat"),
   updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
 });
+
+/* ─────────────────────────  Calendario semanal de comidas  ───────────────────────── */
+
+// Ingrediente de una comida (misma forma que ShoppingItem, sin `checked`).
+export type MealIngredient = {
+  name: string;
+  quantity: string;
+  category: ShoppingCategory;
+};
+
+// Biblioteca de comidas/recetas reutilizables del usuario (proto-receta + macros).
+export const savedMeals = pgTable("saved_meal", {
+  id: serial("id").primaryKey(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  // Slot típico sugerido (no restringe dónde se puede asignar).
+  mealType: text("mealType").notNull(), // breakfast | lunch | dinner | snack
+  recipe: text("recipe").notNull().default(""), // markdown corto
+  ingredients: jsonb("ingredients")
+    .$type<MealIngredient[]>()
+    .notNull()
+    .default([]),
+  // Macros por porción; servings = porciones que rinde la receta.
+  servings: integer("servings").notNull().default(1),
+  kcal: real("kcal").notNull().default(0),
+  protein: real("protein").notNull().default(0),
+  carb: real("carb").notNull().default(0),
+  fat: real("fat").notNull().default(0),
+  source: text("source").notNull().default("ai"), // ai | manual
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+});
+
+// Asignación de una comida a un día × slot. Un slot por (usuario, fecha, tipo).
+export const mealPlanEntries = pgTable(
+  "meal_plan_entry",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    date: date("date").notNull(),
+    mealType: text("mealType").notNull(), // slot: breakfast | lunch | dinner | snack
+    savedMealId: integer("savedMealId")
+      .notNull()
+      .references(() => savedMeals.id, { onDelete: "cascade" }),
+    // Vínculo al registro creado al "marcar como comido" (null = no comido aún).
+    mealLogId: integer("mealLogId").references(() => mealLogs.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [unique().on(t.userId, t.date, t.mealType)]
+);

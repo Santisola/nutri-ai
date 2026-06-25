@@ -60,6 +60,7 @@ export default async function PerfilPage() {
             goalType: profile.goalType,
             goalRateKgPerWeek: profile.goalRateKgPerWeek,
             targetWeightKg: profile.targetWeightKg,
+            householdSize: profile.householdSize,
             dietaryPrefs: profile.dietaryPrefs ?? [],
             allergies: profile.allergies ?? [],
             dislikes: profile.dislikes ?? [],

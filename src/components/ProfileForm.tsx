@@ -26,6 +26,7 @@ export interface ProfileDefaults {
   goalType?: string;
   goalRateKgPerWeek?: number;
   targetWeightKg?: number | null;
+  householdSize?: number;
   dietaryPrefs?: string[];
   allergies?: string[];
   dislikes?: string[];
@@ -255,6 +256,23 @@ export default function ProfileForm({
       desc: "Para personalizar tu plan y las sugerencias. Todo opcional.",
       node: (
         <>
+          <div>
+            <label className={label} htmlFor="householdSize">
+              Personas en tu grupo familiar
+            </label>
+            <input
+              id="householdSize"
+              name="householdSize"
+              type="number"
+              min={1}
+              max={20}
+              defaultValue={d.householdSize ?? 1}
+              className={field}
+            />
+            <p className="mt-1 text-xs text-zinc-400">
+              Lo usamos para armar tu lista de compras con las cantidades justas.
+            </p>
+          </div>
           <div>
             <label className={label} htmlFor="dietaryPrefs">
               Preferencias (separadas por coma)

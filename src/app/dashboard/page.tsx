@@ -13,6 +13,8 @@ import { Beef, Wheat, Droplet, type LucideIcon } from "lucide-react";
 import AddFood from "./AddFood";
 import MealList from "./MealList";
 import MealSuggestion from "./MealSuggestion";
+import ShoppingListCard from "./ShoppingListCard";
+import WeekCard from "./WeekCard";
 import WeightForm from "./WeightForm";
 import WeightChart from "./WeightChart";
 
@@ -99,6 +101,12 @@ export default async function DashboardPage() {
 
       {/* Sugerencia */}
       <MealSuggestion />
+
+      {/* Accesos: semana y lista de compras */}
+      <div className="flex flex-col gap-3">
+        <WeekCard />
+        <ShoppingListCard />
+      </div>
 
       {/* Peso */}
       <section className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">

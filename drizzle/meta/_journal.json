@@ -29,6 +29,20 @@
       "when": 1782180891861,
       "tag": "0003_chunky_mongoose",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782352070949,
+      "tag": "0004_eminent_the_renegades",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782354690940,
+      "tag": "0005_greedy_ben_parker",
+      "breakpoints": true
     }
   ]
 }

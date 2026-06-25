@@ -6,8 +6,12 @@ import {
   mealLogItems,
   weightLogs,
   nutritionPlans,
+  shoppingLists,
+  savedMeals,
+  mealPlanEntries,
 } from "@/db/schema";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, lte } from "drizzle-orm";
+import { addDaysISO } from "@/lib/date";
 import { auth } from "@/auth";
 
 export async function getCurrentUserId(): Promise<string | null> {
@@ -80,6 +84,49 @@ export async function getPlan(userId: string) {
     .where(eq(nutritionPlans.userId, userId))
     .limit(1);
   return rows[0] ?? null;
+}
+
+export async function getShoppingList(userId: string) {
+  const rows = await db
+    .select()
+    .from(shoppingLists)
+    .where(eq(shoppingLists.userId, userId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export type SavedMeal = typeof savedMeals.$inferSelect;
+export type WeekEntry = typeof mealPlanEntries.$inferSelect & {
+  meal: SavedMeal;
+};
+
+/** Comidas planificadas de la semana (lunes–domingo) con su comida guardada. */
+export async function getWeekPlan(
+  userId: string,
+  weekStart: string
+): Promise<WeekEntry[]> {
+  const weekEnd = addDaysISO(weekStart, 6);
+  const rows = await db
+    .select({ entry: mealPlanEntries, meal: savedMeals })
+    .from(mealPlanEntries)
+    .innerJoin(savedMeals, eq(mealPlanEntries.savedMealId, savedMeals.id))
+    .where(
+      and(
+        eq(mealPlanEntries.userId, userId),
+        gte(mealPlanEntries.date, weekStart),
+        lte(mealPlanEntries.date, weekEnd)
+      )
+    );
+  return rows.map((r) => ({ ...r.entry, meal: r.meal }));
+}
+
+/** Biblioteca de comidas guardadas del usuario (más recientes primero). */
+export async function getSavedMeals(userId: string): Promise<SavedMeal[]> {
+  return db
+    .select()
+    .from(savedMeals)
+    .where(eq(savedMeals.userId, userId))
+    .orderBy(desc(savedMeals.createdAt));
 }
 
 export async function getWeightHistory(userId: string, limit = 30) {

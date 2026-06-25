@@ -45,7 +45,9 @@ function MealRow({ meal }: { meal: MealWithItems }) {
             {MEAL_LABEL[meal.mealType] ?? meal.mealType}
           </p>
           <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
-            {meal.items.map((i) => `${i.label} (${i.grams}g)`).join(" · ")}
+            {meal.items
+              .map((i) => (i.grams > 0 ? `${i.label} (${i.grams}g)` : i.label))
+              .join(" · ")}
           </p>
         </div>
         <button

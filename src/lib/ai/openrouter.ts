@@ -14,6 +14,12 @@ import {
   type ChatReply,
   type PlanContext,
   type ImportedTargets,
+  type ShoppingListContext,
+  type ShoppingListResult,
+  type MealType,
+  type GeneratedMeal,
+  type WeekMealPool,
+  type ConsolidateShoppingInput,
   visionResultSchema,
   mealSuggestionSchema,
   macroEstimateSchema,
@@ -22,6 +28,9 @@ import {
   dayFromTextSchema,
   chatReplySchema,
   importedTargetsSchema,
+  shoppingListSchema,
+  weekMealPoolSchema,
+  generatedMealResultSchema,
 } from "./types";
 
 /**
@@ -84,6 +93,13 @@ const GOAL_ES: Record<PlanContext["goalType"], string> = {
   lose: "bajar de peso",
   maintain: "mantener el peso",
   gain: "subir de peso",
+};
+
+const MEAL_TYPE_ES: Record<MealType, string> = {
+  breakfast: "desayuno",
+  lunch: "almuerzo",
+  snack: "merienda",
+  dinner: "cena",
 };
 
 function planContextBlock(ctx: PlanContext): string {
@@ -455,5 +471,173 @@ ${PLAN_FORMAT}`;
     });
 
     return stripFences(firstContent(res));
+  }
+
+  async generateShoppingList(
+    ctx: ShoppingListContext
+  ): Promise<ShoppingListResult> {
+    const model = process.env.AI_TEXT_MODEL;
+    if (!model) throw new Error("AI_TEXT_MODEL no está definida");
+
+    const dias = ctx.period === "biweekly" ? 14 : 7;
+    const planBlock = ctx.plan
+      ? `\nPlan actual del usuario (alineá la lista a esto):\n"""\n${ctx.plan}\n"""`
+      : "";
+
+    const prompt = `Sos un asistente de nutrición práctico para Argentina. Armá una LISTA DE COMPRAS para ${dias} días y ${ctx.householdSize} persona(s), alineada al objetivo del usuario.
+
+Objetivo diario por persona: ${ctx.targets.kcal} kcal, ${ctx.targets.protein}g proteína, ${ctx.targets.carb}g carbohidratos, ${ctx.targets.fat}g grasa.
+Preferencias: ${ctx.dietaryPrefs.join(", ") || "ninguna"}.
+Alergias (EVITAR SIEMPRE): ${ctx.allergies.join(", ") || "ninguna"}.
+No le gusta: ${ctx.dislikes.join(", ") || "nada"}.${planBlock}
+
+REGLAS:
+- Ingredientes ACCESIBLES y comunes: súper/hipermercado/verdulería/carnicería de barrio. NADA de lujo, importado raro ni dietética cara.
+- Cantidades estimadas para ${ctx.householdSize} persona(s) durante ${dias} días (escalá linealmente). Usá unidades concretas ("1.5 kg", "12 unidades", "2 paquetes").
+- Agrupá cada ítem en una categoría usando EXACTAMENTE uno de estos valores: verduleria, carniceria, pescaderia, almacen, lacteos, panificados, congelados, bebidas, otros.
+- Sumá 3 a 6 ideas de comidas RÁPIDAS y simples alineadas al plan que se preparen con esos ingredientes, con una receta breve (2-4 pasos). mealType debe ser EXACTAMENTE uno de: breakfast, lunch, dinner, snack.
+
+Devolvé SOLO un JSON con esta forma exacta (sin texto extra antes ni después):
+{"items":[{"name":"","quantity":"","category":"almacen"}],"mealIdeas":[{"mealType":"lunch","title":"","recipe":"","ingredients":[{"name":"","quantity":"","category":"almacen"}]}]}`;
+
+    const res = await client().chat.completions.create({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.5,
+      max_tokens: 2000,
+    });
+
+    return shoppingListSchema.parse(extractJson(firstContent(res)));
+  }
+
+  async generateWeekMealPool(
+    ctx: PlanContext,
+    count = 10
+  ): Promise<WeekMealPool> {
+    const model = process.env.AI_TEXT_MODEL;
+    if (!model) throw new Error("AI_TEXT_MODEL no está definida");
+
+    const prompt = `Sos un asistente de nutrición práctico para Argentina. Proponé ${count} comidas VARIADAS, simples y accesibles para armar la semana de una persona, alineadas a su objetivo.
+
+${planContextBlock(ctx)}
+
+REGLAS:
+- Cubrí los 4 momentos del día. mealType debe ser EXACTAMENTE uno de: breakfast (desayuno), lunch (almuerzo), snack (merienda), dinner (cena). Incluí al menos 2 de cada tipo.
+- Comidas comunes y económicas de Argentina; ingredientes de súper/verdulería/carnicería de barrio. NADA de lujo ni importado raro.
+- Para cada comida: receta breve (2-4 pasos), ingredientes con cantidad y categoría, porciones que rinde, y macros POR PORCIÓN.
+- Respetá SIEMPRE las alergias.
+- category debe ser EXACTAMENTE uno de: verduleria, carniceria, pescaderia, almacen, lacteos, panificados, congelados, bebidas, otros.
+
+Devolvé SOLO un JSON con esta forma exacta (sin texto extra):
+{"meals":[{"mealType":"lunch","title":"","recipe":"","ingredients":[{"name":"","quantity":"","category":"almacen"}],"servings":1,"kcal":0,"protein":0,"carb":0,"fat":0}]}`;
+
+    const res = await client().chat.completions.create({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7,
+      max_tokens: 3000,
+    });
+
+    return weekMealPoolSchema.parse(extractJson(firstContent(res)));
+  }
+
+  async generateMealForSlot(
+    ctx: PlanContext,
+    mealType: MealType
+  ): Promise<GeneratedMeal> {
+    const model = process.env.AI_TEXT_MODEL;
+    if (!model) throw new Error("AI_TEXT_MODEL no está definida");
+
+    const prompt = `Sos un asistente de nutrición práctico para Argentina. Proponé UNA comida para el momento "${MEAL_TYPE_ES[mealType]}", simple, accesible y alineada al objetivo del usuario.
+
+${planContextBlock(ctx)}
+
+REGLAS:
+- mealType debe ser EXACTAMENTE "${mealType}".
+- Ingredientes comunes y económicos de Argentina (súper/verdulería/carnicería de barrio).
+- Receta breve (2-4 pasos), ingredientes con cantidad y categoría, porciones y macros POR PORCIÓN.
+- Respetá SIEMPRE las alergias. category exacto: verduleria, carniceria, pescaderia, almacen, lacteos, panificados, congelados, bebidas, otros.
+
+Devolvé SOLO un JSON con esta forma exacta (sin texto extra):
+{"mealType":"${mealType}","title":"","recipe":"","ingredients":[{"name":"","quantity":"","category":"almacen"}],"servings":1,"kcal":0,"protein":0,"carb":0,"fat":0}`;
+
+    const res = await client().chat.completions.create({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7,
+      max_tokens: 900,
+    });
+
+    return generatedMealResultSchema.parse(extractJson(firstContent(res)));
+  }
+
+  async generateMealRecipe(
+    description: string,
+    ctx: PlanContext
+  ): Promise<GeneratedMeal> {
+    const model = process.env.AI_TEXT_MODEL;
+    if (!model) throw new Error("AI_TEXT_MODEL no está definida");
+
+    const prompt = `El usuario quiere guardar una comida descrita libremente y necesita su receta y datos nutricionales.
+Descripción: "${description}".
+
+${planContextBlock(ctx)}
+
+Generá la receta de esa comida:
+- Elegí el mealType más adecuado (breakfast, lunch, snack o dinner).
+- Receta breve (2-4 pasos), ingredientes con cantidad y categoría, porciones que rinde y macros POR PORCIÓN.
+- Ingredientes accesibles de Argentina. Respetá SIEMPRE las alergias del usuario.
+- category exacto: verduleria, carniceria, pescaderia, almacen, lacteos, panificados, congelados, bebidas, otros.
+
+Devolvé SOLO un JSON con esta forma exacta (sin texto extra):
+{"mealType":"lunch","title":"","recipe":"","ingredients":[{"name":"","quantity":"","category":"almacen"}],"servings":1,"kcal":0,"protein":0,"carb":0,"fat":0}`;
+
+    const res = await client().chat.completions.create({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.5,
+      max_tokens: 900,
+    });
+
+    return generatedMealResultSchema.parse(extractJson(firstContent(res)));
+  }
+
+  async consolidateShoppingList(
+    input: ConsolidateShoppingInput
+  ): Promise<ShoppingListResult> {
+    const model = process.env.AI_TEXT_MODEL;
+    if (!model) throw new Error("AI_TEXT_MODEL no está definida");
+
+    const dias = input.period === "biweekly" ? 14 : 7;
+    const mealsBlock = input.meals
+      .map(
+        (m) =>
+          `- ${m.title}: ${m.ingredients
+            .map((i) => `${i.name} (${i.quantity})`)
+            .join(", ")}`
+      )
+      .join("\n");
+
+    const prompt = `Te paso las comidas planificadas de una persona para ${dias} días. Consolidá una ÚNICA lista de compras para ${input.householdSize} persona(s), sumando los ingredientes repetidos y escalando las cantidades.
+
+COMIDAS PLANIFICADAS:
+${mealsBlock}
+
+REGLAS:
+- Unificá ingredientes iguales en un solo ítem, sumando cantidades. Escalá por ${input.householdSize} persona(s) y por los ${dias} días que correspondan.
+- Usá unidades concretas ("1.5 kg", "12 unidades", "2 paquetes").
+- Agrupá cada ítem en una categoría usando EXACTAMENTE uno de: verduleria, carniceria, pescaderia, almacen, lacteos, panificados, congelados, bebidas, otros.
+
+Devolvé SOLO un JSON con esta forma exacta (mealIdeas vacío), sin texto extra:
+{"items":[{"name":"","quantity":"","category":"almacen"}],"mealIdeas":[]}`;
+
+    const res = await client().chat.completions.create({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3,
+      max_tokens: 2000,
+    });
+
+    return shoppingListSchema.parse(extractJson(firstContent(res)));
   }
 }

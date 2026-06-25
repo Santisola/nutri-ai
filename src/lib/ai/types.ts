@@ -95,6 +95,100 @@ export const mealSuggestionSchema = z.object({
 });
 export type MealSuggestion = z.infer<typeof mealSuggestionSchema>;
 
+/* ───── Lista de compras (ítems + ideas de comida) ───── */
+
+export const SHOPPING_CATEGORY_VALUES = [
+  "verduleria",
+  "carniceria",
+  "pescaderia",
+  "almacen",
+  "lacteos",
+  "panificados",
+  "congelados",
+  "bebidas",
+  "otros",
+] as const;
+
+// Ítem tal como lo produce el modelo (sin `checked`, que lo agrega el server).
+const shoppingItemSchema = z.object({
+  name: z.string().min(1),
+  quantity: z.string().catch(""),
+  category: z.enum(SHOPPING_CATEGORY_VALUES).catch("otros"),
+});
+export type ShoppingItemAI = z.infer<typeof shoppingItemSchema>;
+
+// Idea de comida tal como la produce el modelo (sin `id`/`source`).
+const mealIdeaSchema = z.object({
+  mealType: z.enum(MEAL_TYPE_VALUES).catch("lunch"),
+  title: z.string().min(1),
+  recipe: z.string().catch(""),
+  ingredients: z
+    .array(shoppingItemSchema.nullable().catch(null))
+    .transform((arr) => arr.filter((x): x is ShoppingItemAI => x !== null)),
+});
+
+export const shoppingListSchema = z.object({
+  items: z
+    .array(shoppingItemSchema.nullable().catch(null))
+    .transform((arr) => arr.filter((x): x is ShoppingItemAI => x !== null)),
+  mealIdeas: z
+    .array(mealIdeaSchema.nullable().catch(null))
+    .transform((arr) =>
+      arr.filter((m): m is z.infer<typeof mealIdeaSchema> => m !== null)
+    ),
+});
+export type ShoppingListResult = z.infer<typeof shoppingListSchema>;
+
+export interface ShoppingListContext {
+  targets: { kcal: number; protein: number; carb: number; fat: number };
+  period: "weekly" | "biweekly";
+  householdSize: number;
+  dietaryPrefs: string[];
+  allergies: string[];
+  dislikes: string[];
+  plan?: string | null; // markdown del plan actual, como contexto
+}
+
+/* ───── Calendario: comidas generadas (proto-receta con macros) ───── */
+
+export type MealType = (typeof MEAL_TYPE_VALUES)[number];
+
+// Comida con receta + ingredientes + macros por porción, tal como la produce el
+// modelo (sin `id`/`source`, que los agrega el server al guardar en saved_meal).
+const generatedMealSchema = z.object({
+  mealType: z.enum(MEAL_TYPE_VALUES).catch("lunch"),
+  title: z.string().min(1),
+  recipe: z.string().catch(""),
+  ingredients: z
+    .array(shoppingItemSchema.nullable().catch(null))
+    .transform((arr) => arr.filter((x): x is ShoppingItemAI => x !== null)),
+  servings: z.coerce.number().int().positive().catch(1),
+  kcal: z.coerce.number().nonnegative().catch(0),
+  protein: z.coerce.number().nonnegative().catch(0),
+  carb: z.coerce.number().nonnegative().catch(0),
+  fat: z.coerce.number().nonnegative().catch(0),
+});
+export type GeneratedMeal = z.infer<typeof generatedMealSchema>;
+
+export const generatedMealResultSchema = generatedMealSchema;
+
+export const weekMealPoolSchema = z.object({
+  meals: z
+    .array(generatedMealSchema.nullable().catch(null))
+    .transform((arr) => arr.filter((m): m is GeneratedMeal => m !== null)),
+});
+export type WeekMealPool = z.infer<typeof weekMealPoolSchema>;
+
+// Entrada para consolidar la lista de compras desde comidas planificadas.
+export interface ConsolidateShoppingInput {
+  meals: Array<{
+    title: string;
+    ingredients: Array<{ name: string; quantity: string; category: string }>;
+  }>;
+  householdSize: number;
+  period: "weekly" | "biweekly";
+}
+
 /* ───── Interfaces de proveedores (abstracción para migrar a pago) ───── */
 
 export interface VisionProvider {
@@ -216,4 +310,25 @@ export interface TextProvider {
     instruction: string,
     ctx: PlanContext
   ): Promise<string>;
+  /** Genera la lista de compras (ítems + ideas de comida) alineada al plan. */
+  generateShoppingList(ctx: ShoppingListContext): Promise<ShoppingListResult>;
+  /** Genera un pool de comidas variadas para armar la semana del calendario. */
+  generateWeekMealPool(
+    ctx: PlanContext,
+    count?: number
+  ): Promise<WeekMealPool>;
+  /** Genera una comida alternativa para un slot puntual (mealType dado). */
+  generateMealForSlot(
+    ctx: PlanContext,
+    mealType: MealType
+  ): Promise<GeneratedMeal>;
+  /** Genera receta + ingredientes + macros a partir de una descripción libre. */
+  generateMealRecipe(
+    description: string,
+    ctx: PlanContext
+  ): Promise<GeneratedMeal>;
+  /** Consolida la lista de compras a partir de comidas planificadas. */
+  consolidateShoppingList(
+    input: ConsolidateShoppingInput
+  ): Promise<ShoppingListResult>;
 }
